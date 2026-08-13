@@ -31,9 +31,10 @@ test("server-renders the finished Capital product", async () => {
 });
 
 test("ships the durable hour loop and bespoke social card", async () => {
-  const [page, route, schema, layout] = await Promise.all([
+  const [page, route, backlogRoute, schema, layout] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/api/hours/route.ts", root), "utf8"),
+    readFile(new URL("app/api/backlog/route.ts", root), "utf8"),
     readFile(new URL("db/schema.ts", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     access(new URL("public/og.png", root)),
@@ -44,6 +45,13 @@ test("ships the durable hour loop and bespoke social card", async () => {
   assert.match(route, /export async function POST/);
   assert.match(route, /export async function PATCH/);
   assert.doesNotMatch(route, /Notion|notion/);
+  assert.match(backlogRoute, /export async function GET/);
+  assert.match(backlogRoute, /export async function POST/);
+  assert.match(backlogRoute, /export async function PATCH/);
   assert.match(schema, /idx_hours_date_start/);
+  assert.match(schema, /idx_backlog_status_created/);
   assert.match(layout, /\/og\.png/);
+  assert.match(page, /Find what compounds/);
+  assert.match(page, /Opportunity backlog/);
+  assert.match(page, /Export CSV/);
 });

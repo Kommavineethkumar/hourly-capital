@@ -39,6 +39,17 @@ export async function ensureStorage() {
     )`),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hours_date_start ON hours (date, start_time)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hours_status ON hours (status)"),
+    d1.prepare(`CREATE TABLE IF NOT EXISTS backlog_items (
+      id TEXT PRIMARY KEY NOT NULL,
+      title TEXT NOT NULL,
+      category TEXT NOT NULL,
+      energy TEXT DEFAULT 'Medium' NOT NULL,
+      minutes INTEGER DEFAULT 60 NOT NULL,
+      expected_output TEXT DEFAULT '' NOT NULL,
+      status TEXT DEFAULT 'open' NOT NULL,
+      created_at TEXT NOT NULL
+    )`),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_backlog_status_created ON backlog_items (status, created_at)"),
     d1.prepare("PRAGMA optimize"),
   ]);
 }

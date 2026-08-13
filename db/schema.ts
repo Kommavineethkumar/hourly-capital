@@ -31,3 +31,21 @@ export const hours = sqliteTable(
 
 export type Hour = typeof hours.$inferSelect;
 export type NewHour = typeof hours.$inferInsert;
+
+export const backlogItems = sqliteTable(
+  "backlog_items",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    category: text("category").notNull(),
+    energy: text("energy").notNull().default("Medium"),
+    minutes: integer("minutes").notNull().default(60),
+    expectedOutput: text("expected_output").notNull().default(""),
+    status: text("status").notNull().default("open"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("idx_backlog_status_created").on(table.status, table.createdAt)],
+);
+
+export type BacklogItem = typeof backlogItems.$inferSelect;
+export type NewBacklogItem = typeof backlogItems.$inferInsert;

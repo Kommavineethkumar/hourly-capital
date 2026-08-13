@@ -15,6 +15,13 @@
       "when": 1786584092974,
       "tag": "0001_fat_joshua_kane",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786584408763,
+      "tag": "0002_milky_firelord",
+      "breakpoints": true
     }
   ]
 }
