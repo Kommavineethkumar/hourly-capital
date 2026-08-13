@@ -82,6 +82,7 @@ export default function Home() {
   const [now, setNow] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [intention, setIntention] = useState("");
   const [expectedOutput, setExpectedOutput] = useState("");
@@ -243,6 +244,30 @@ export default function Home() {
     if (response.ok) setBacklog((current) => current.filter((entry) => entry.id !== item.id));
   }
 
+  async function removeHour(hour: Hour) {
+    const description = hour.status === "planned" ? "the in-progress hour" : `“${hour.intention}”`;
+    if (!window.confirm(`Remove ${description} from your timeline? This cannot be undone.`)) return;
+
+    setDeletingId(hour.id);
+    setError("");
+    try {
+      const response = await fetch("/api/hours", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: hour.id }),
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error || "Could not remove the entry.");
+      setHours((current) => current.filter((entry) => entry.id !== hour.id));
+      setHistory((current) => current.filter((entry) => entry.id !== hour.id));
+      if (active?.id === hour.id) setClosing(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not remove the entry.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   const stats = useMemo(() => {
     const valuable = completed.filter((hour) => (hour.score ?? 0) >= 2).length;
     const compounding = completed.filter((hour) => hour.score === 3).length;
@@ -373,13 +398,14 @@ export default function Home() {
                     <label htmlFor="expected">Expected output <span>optional</span></label>
                     <input id="expected" value={expectedOutput} onChange={(event) => setExpectedOutput(event.target.value)} placeholder="A note, decision, commit, diagram…" />
                   </div>
-                  <div className="mode-field">
+                  <div className="mode-field select-field">
                     <label htmlFor="mode">Effort</label>
                     <select id="mode" value={workMode} onChange={(event) => setWorkMode(event.target.value)}>
                       <option value="human">Human active</option>
                       <option value="agent">Agent work</option>
                       <option value="oversight">Human oversight</option>
                     </select>
+                    <span className="select-arrow" aria-hidden="true">⌄</span>
                   </div>
                 </div>
                 <button className="primary" disabled={!intention.trim() || saving}>{saving ? "Starting…" : "Begin the hour"}<span>→</span></button>
@@ -403,6 +429,7 @@ export default function Home() {
                         <h3>{hour.intention}</h3>
                         {hour.output && <p><b>Output</b> {hour.output}</p>}
                       </div>
+                      <button className="remove-entry" type="button" disabled={deletingId === hour.id} onClick={() => removeHour(hour)} aria-label={`Remove ${hour.intention} from timeline`}>{deletingId === hour.id ? "Removing…" : "Remove"}</button>
                     </article>
                   ))}
                 </div>
@@ -472,7 +499,19 @@ export default function Home() {
       ) : view === "backlog" ? (
         <section className="history-page">
           <div className="review-heading"><p className="eyebrow">Opportunity backlog</p><h1>Never waste a surprise hour.</h1><p>Keep only ideas that can become a useful output, clearer knowledge, leverage, or optionality.</p></div>
-          <form className="idea-form card" onSubmit={addIdea}><label htmlFor="idea">Capture an opportunity</label><div><input id="idea" value={idea} onChange={(event) => setIdea(event.target.value)} placeholder="e.g. Compare three Rust LDAP libraries and record the tradeoffs" required /><input aria-label="Expected output" value={ideaOutput} onChange={(event) => setIdeaOutput(event.target.value)} placeholder="Expected output (optional)" /><select aria-label="Career capital category" value={ideaCategory} onChange={(event) => setIdeaCategory(event.target.value)}>{categories.map(([name]) => <option key={name}>{name}</option>)}</select><select aria-label="Energy needed" value={ideaEnergy} onChange={(event) => setIdeaEnergy(event.target.value)}><option>Low</option><option>Medium</option><option>High</option></select><select aria-label="Time needed" value={ideaMinutes} onChange={(event) => setIdeaMinutes(Number(event.target.value))}><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>60 min</option><option value={90}>90 min</option></select><button className="primary" disabled={!idea.trim() || saving}>Add idea <span>+</span></button></div></form>
+          <form className="idea-form card" onSubmit={addIdea}>
+            <label htmlFor="idea">Capture an opportunity</label>
+            <div className="idea-capture-grid">
+              <input id="idea" value={idea} onChange={(event) => setIdea(event.target.value)} placeholder="e.g. Compare three Rust LDAP libraries and record the tradeoffs" required />
+              <input aria-label="Expected output" value={ideaOutput} onChange={(event) => setIdeaOutput(event.target.value)} placeholder="Expected output (optional)" />
+              <button className="primary" disabled={!idea.trim() || saving}>Add idea <span>+</span></button>
+            </div>
+            <div className="idea-select-grid">
+              <label className="select-field">Category<select value={ideaCategory} onChange={(event) => setIdeaCategory(event.target.value)}>{categories.map(([name]) => <option key={name}>{name}</option>)}</select><span className="select-arrow" aria-hidden="true">⌄</span></label>
+              <label className="select-field">Energy needed<select value={ideaEnergy} onChange={(event) => setIdeaEnergy(event.target.value)}><option>Low</option><option>Medium</option><option>High</option></select><span className="select-arrow" aria-hidden="true">⌄</span></label>
+              <label className="select-field">Time needed<select value={ideaMinutes} onChange={(event) => setIdeaMinutes(Number(event.target.value))}><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>60 min</option><option value={90}>90 min</option></select><span className="select-arrow" aria-hidden="true">⌄</span></label>
+            </div>
+          </form>
           <div className="backlog-grid">
             {backlog.length ? backlog.map((item) => <article className="backlog-card card" key={item.id}><div className="tag-row"><span className={`tag ${colors[item.category]}`}>{item.category}</span><span className="tag neutral">{item.minutes} min · {item.energy} energy</span></div><h2>{item.title}</h2>{item.expectedOutput && <p>{item.expectedOutput}</p>}<div><button className="secondary" onClick={() => completeIdea(item)}>Done</button><button className="primary dark" onClick={() => planIdea(item)}>Plan this <span>→</span></button></div></article>) : <div className="empty-state"><strong>No opportunities waiting.</strong><span>Add a learning question, artifact, automation idea, or role to explore.</span></div>}
           </div>
@@ -483,7 +522,7 @@ export default function Home() {
           {historyGroups.length ? historyGroups.map(([date, records]) => (
             <article className="history-day card" key={date}>
               <header><div><p className="eyebrow">{new Date(`${date}T12:00:00`).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}</p><h2>{records.filter((hour) => hour.output).length} outputs from {records.length} hours</h2></div><strong>{records.filter((hour) => hour.score === 3).length} compounding</strong></header>
-              {records.sort((a, b) => b.startTime.localeCompare(a.startTime)).map((hour) => <div className="history-record" key={hour.id}><span className="history-time">{hour.startTime}</span><span className={`category-mark ${colors[hour.category]}`}>{categories.find(([name]) => name === hour.category)?.[2] ?? "·"}</span><div><h3>{hour.intention}</h3><p>{hour.output || hour.actualActivity}</p></div><span className="history-score">{hour.score ?? "—"} / 3</span></div>)}
+              {records.sort((a, b) => b.startTime.localeCompare(a.startTime)).map((hour) => <div className="history-record" key={hour.id}><span className="history-time">{hour.startTime}</span><span className={`category-mark ${colors[hour.category]}`}>{categories.find(([name]) => name === hour.category)?.[2] ?? "·"}</span><div><h3>{hour.intention}</h3><p>{hour.output || hour.actualActivity}</p></div><span className="history-score">{hour.score ?? "—"} / 3</span><button className="remove-entry" type="button" disabled={deletingId === hour.id} onClick={() => removeHour(hour)} aria-label={`Remove ${hour.intention} from history`}>{deletingId === hour.id ? "Removing…" : "Remove"}</button></div>)}
             </article>
           )) : <div className="empty-state"><strong>No history yet.</strong><span>Your completed hours will collect here.</span></div>}
         </section>
@@ -504,7 +543,7 @@ export default function Home() {
               <fieldset><legend>Value <span>optional</span></legend><div className="segmented">{scoreNames.map((name, index) => <button key={name} type="button" aria-pressed={score === index} className={score === index ? "selected" : ""} onClick={() => setScore(score === index ? null : index)}><b>{index}</b><span>{name}</span></button>)}</div></fieldset>
               <fieldset><legend>Focus <span>optional</span></legend><div className="focus-buttons">{[1, 2, 3, 4, 5].map((value) => <button key={value} type="button" aria-pressed={focus === value} className={focus === value ? "selected" : ""} onClick={() => setFocus(focus === value ? null : value)}>{value}</button>)}</div></fieldset>
             </div>
-            <div className="modal-footer"><div className="footer-fields"><label>Energy <span>optional</span><select value={energy} onChange={(event) => setEnergy(event.target.value)}><option value="">Not set</option><option>Low</option><option>Medium</option><option>High</option></select></label><label>Interruptions <select value={interruptions} onChange={(event) => setInterruptions(Number(event.target.value))}><option value={0}>None</option><option value={1}>One</option><option value={2}>Two</option><option value={3}>Three+</option></select></label></div><button className="primary" disabled={saving || !actualActivity.trim()}>{saving ? "Saving…" : "Save & close hour"}<span>✓</span></button></div>
+            <div className="modal-footer"><div className="footer-fields"><label className="select-field">Energy <span>optional</span><select value={energy} onChange={(event) => setEnergy(event.target.value)}><option value="">Not set</option><option>Low</option><option>Medium</option><option>High</option></select><span className="select-arrow" aria-hidden="true">⌄</span></label><label className="select-field">Interruptions <select value={interruptions} onChange={(event) => setInterruptions(Number(event.target.value))}><option value={0}>None</option><option value={1}>One</option><option value={2}>Two</option><option value={3}>Three+</option></select><span className="select-arrow" aria-hidden="true">⌄</span></label></div><button className="primary" disabled={saving || !actualActivity.trim()}>{saving ? "Saving…" : "Save & close hour"}<span>✓</span></button></div>
           </form>
         </div>
       )}

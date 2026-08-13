@@ -111,3 +111,18 @@ export async function PATCH(request: Request) {
     return Response.json({ error: errorMessage(error) }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    await ensureStorage();
+    const payload = (await request.json()) as HourPayload;
+    const id = clean(payload.id, 100);
+    if (!id) return Response.json({ error: "Hour id is required." }, { status: 400 });
+
+    const [hour] = await getDb().delete(hours).where(eq(hours.id, id)).returning();
+    if (!hour) return Response.json({ error: "Hour not found." }, { status: 404 });
+    return Response.json({ hour });
+  } catch (error) {
+    return Response.json({ error: errorMessage(error) }, { status: 500 });
+  }
+}

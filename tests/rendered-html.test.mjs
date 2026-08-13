@@ -44,6 +44,7 @@ test("ships the durable hour loop and bespoke social card", async () => {
   assert.match(page, /Agent work/);
   assert.match(route, /export async function POST/);
   assert.match(route, /export async function PATCH/);
+  assert.match(route, /export async function DELETE/);
   assert.doesNotMatch(route, /Notion|notion/);
   assert.match(backlogRoute, /export async function GET/);
   assert.match(backlogRoute, /export async function POST/);
@@ -54,4 +55,5 @@ test("ships the durable hour loop and bespoke social card", async () => {
   assert.match(page, /Find what compounds/);
   assert.match(page, /Opportunity backlog/);
   assert.match(page, /Export CSV/);
+  assert.match(page, /Remove .* from timeline/);
 });
