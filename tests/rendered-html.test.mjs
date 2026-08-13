@@ -43,7 +43,7 @@ test("ships the durable hour loop and bespoke social card", async () => {
   assert.match(page, /Agent work/);
   assert.match(route, /export async function POST/);
   assert.match(route, /export async function PATCH/);
-  assert.match(route, /syncToNotion/);
+  assert.doesNotMatch(route, /Notion|notion/);
   assert.match(schema, /idx_hours_date_start/);
   assert.match(layout, /\/og\.png/);
 });

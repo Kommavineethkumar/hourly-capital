@@ -1,10 +1,8 @@
-import { env } from "cloudflare:workers";
 import { desc, eq } from "drizzle-orm";
 import { ensureStorage, getDb } from "../../../db";
-import { hours, type Hour, type NewHour } from "../../../db/schema";
+import { hours, type NewHour } from "../../../db/schema";
 
 type HourPayload = Partial<NewHour> & { id?: string };
-type RuntimeEnv = { NOTION_TOKEN?: string; NOTION_DATA_SOURCE_ID?: string };
 
 function clean(value: unknown, max = 2000) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -15,34 +13,6 @@ function errorMessage(error: unknown) {
   return message.includes("no such table")
     ? "Storage is not initialized yet. Apply the generated database migration and retry."
     : message;
-}
-
-async function syncToNotion(hour: Hour) {
-  const runtime = env as unknown as RuntimeEnv;
-  if (!runtime.NOTION_TOKEN || !runtime.NOTION_DATA_SOURCE_ID) return "not_configured";
-
-  const response = await fetch("https://api.notion.com/v1/pages", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${runtime.NOTION_TOKEN}`,
-      "Content-Type": "application/json",
-      "Notion-Version": "2026-03-11",
-    },
-    body: JSON.stringify({
-      parent: { data_source_id: runtime.NOTION_DATA_SOURCE_ID },
-      properties: {
-        Activity: { title: [{ text: { content: hour.intention } }] },
-        Date: { date: { start: `${hour.date}T${hour.startTime}:00` } },
-        Category: { select: { name: hour.category } },
-        Status: { select: { name: hour.status === "completed" ? "Complete" : "Planned" } },
-        Score: hour.score === null ? { number: null } : { number: hour.score },
-        "Work Mode": { select: { name: hour.workMode } },
-        Output: { rich_text: [{ text: { content: hour.output.slice(0, 2000) } }] },
-      },
-    }),
-  });
-
-  return response.ok ? "synced" : "failed";
 }
 
 export async function GET(request: Request) {
@@ -118,18 +88,7 @@ export async function PATCH(request: Request) {
       .returning();
 
     if (!hour) return Response.json({ error: "Hour not found." }, { status: 404 });
-    let notionStatus = "not_configured";
-    try {
-      notionStatus = await syncToNotion(hour);
-    } catch {
-      notionStatus = "failed";
-    }
-    const [saved] = await getDb()
-      .update(hours)
-      .set({ notionStatus })
-      .where(eq(hours.id, hour.id))
-      .returning();
-    return Response.json({ hour: saved });
+    return Response.json({ hour });
   } catch (error) {
     return Response.json({ error: errorMessage(error) }, { status: 500 });
   }

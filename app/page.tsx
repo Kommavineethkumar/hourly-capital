@@ -27,7 +27,6 @@ type Hour = {
   interruptions: number;
   workMode: string;
   status: string;
-  notionStatus: string;
 };
 
 const scoreNames = ["Lost", "Maintenance", "Productive", "Compounding"];

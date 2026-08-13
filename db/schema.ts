@@ -20,7 +20,6 @@ export const hours = sqliteTable(
     followUp: text("follow_up").notNull().default(""),
     workMode: text("work_mode").notNull().default("human"),
     status: text("status").notNull().default("planned"),
-    notionStatus: text("notion_status").notNull().default("not_configured"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },

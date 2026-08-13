@@ -1,0 +1,1 @@
+ALTER TABLE `hours` DROP COLUMN `notion_status`;

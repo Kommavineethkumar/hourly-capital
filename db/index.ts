@@ -34,7 +34,6 @@ export async function ensureStorage() {
       follow_up TEXT DEFAULT '' NOT NULL,
       work_mode TEXT DEFAULT 'human' NOT NULL,
       status TEXT DEFAULT 'planned' NOT NULL,
-      notion_status TEXT DEFAULT 'not_configured' NOT NULL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )`),
