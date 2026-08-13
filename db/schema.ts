@@ -49,3 +49,27 @@ export const backlogItems = sqliteTable(
 
 export type BacklogItem = typeof backlogItems.$inferSelect;
 export type NewBacklogItem = typeof backlogItems.$inferInsert;
+
+export const codexTasks = sqliteTable(
+  "codex_tasks",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    instructions: text("instructions").notNull().default(""),
+    status: text("status").notNull().default("inbox"),
+    startImmediately: integer("start_immediately", { mode: "boolean" }).notNull().default(false),
+    usePriorContext: integer("use_prior_context", { mode: "boolean" }).notNull().default(true),
+    useAside: integer("use_aside", { mode: "boolean" }).notNull().default(false),
+    projectPath: text("project_path").notNull().default(""),
+    codexThreadId: text("codex_thread_id"),
+    statusMessage: text("status_message").notNull().default(""),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    startedAt: text("started_at"),
+    completedAt: text("completed_at"),
+  },
+  (table) => [index("idx_codex_tasks_status_created").on(table.status, table.createdAt)],
+);
+
+export type CodexTask = typeof codexTasks.$inferSelect;
+export type NewCodexTask = typeof codexTasks.$inferInsert;
