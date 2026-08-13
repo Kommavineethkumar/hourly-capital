@@ -57,3 +57,29 @@ test("ships the durable hour loop and bespoke social card", async () => {
   assert.match(page, /Export CSV/);
   assert.match(page, /Remove .* from timeline/);
 });
+
+test("ships the Codex task queue, runner, and bounded context adapters", async () => {
+  const [tasksView, tasksRoute, runner, contextCollector, schema] = await Promise.all([
+    readFile(new URL("app/components/tasks-view.tsx", root), "utf8"),
+    readFile(new URL("app/api/tasks/route.ts", root), "utf8"),
+    readFile(new URL("scripts/capital-runner.mjs", root), "utf8"),
+    readFile(new URL("scripts/lib/context-collector.mjs", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+  ]);
+
+  assert.match(tasksView, /Put useful work in motion/);
+  assert.match(tasksView, /codex:\/\/threads\//);
+  assert.match(tasksRoute, /export async function GET/);
+  assert.match(tasksRoute, /export async function POST/);
+  assert.match(tasksRoute, /export async function PATCH/);
+  assert.match(tasksRoute, /export async function DELETE/);
+  assert.match(runner, /thread\/start/);
+  assert.match(runner, /turn\/start/);
+  assert.match(runner, /gpt-5\.6-sol/);
+  assert.match(contextCollector, /collectRelevantContext/);
+  assert.match(contextCollector, /Claude/);
+  assert.match(contextCollector, /Codex/);
+  assert.match(contextCollector, /Pi/);
+  assert.match(contextCollector, /Hermes/);
+  assert.match(schema, /codex_tasks/);
+});

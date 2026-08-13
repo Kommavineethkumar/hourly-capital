@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import TasksView from "./components/tasks-view";
 
 const categories = [
   ["Learning", "Understand something new", "L"],
@@ -52,7 +53,7 @@ function displayDate(date: Date) {
   return new Intl.DateTimeFormat("en", { weekday: "long", month: "long", day: "numeric" }).format(date);
 }
 
-type View = "today" | "review" | "insights" | "backlog" | "history";
+type View = "today" | "tasks" | "review" | "insights" | "backlog" | "history";
 type BacklogItem = { id: string; title: string; category: string; energy: string; minutes: number; expectedOutput: string; status: string };
 
 function minutesBetween(start: string, end: string | null) {
@@ -332,6 +333,7 @@ export default function Home() {
         </button>
         <nav aria-label="Primary navigation">
           <button aria-current={view === "today" ? "page" : undefined} className={view === "today" ? "active" : ""} onClick={() => setView("today")}>Today</button>
+          <button aria-current={view === "tasks" ? "page" : undefined} className={view === "tasks" ? "active" : ""} onClick={() => setView("tasks")}>Tasks</button>
           <button aria-current={view === "review" ? "page" : undefined} className={view === "review" ? "active" : ""} onClick={() => setView("review")}>Review</button>
           <button aria-current={view === "insights" ? "page" : undefined} className={view === "insights" ? "active" : ""} onClick={() => setView("insights")}>Insights</button>
           <button aria-current={view === "backlog" ? "page" : undefined} className={view === "backlog" ? "active" : ""} onClick={() => setView("backlog")}>Backlog</button>
@@ -496,6 +498,8 @@ export default function Home() {
             })}
           </article>
         </section>
+      ) : view === "tasks" ? (
+        <TasksView />
       ) : view === "backlog" ? (
         <section className="history-page">
           <div className="review-heading"><p className="eyebrow">Opportunity backlog</p><h1>Never waste a surprise hour.</h1><p>Keep only ideas that can become a useful output, clearer knowledge, leverage, or optionality.</p></div>
