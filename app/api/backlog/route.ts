@@ -1,5 +1,4 @@
 import { desc, eq } from "drizzle-orm";
-import { unauthorized } from "../../api-auth";
 import { ensureStorage, getDb } from "../../../db";
 import { backlogItems, type NewBacklogItem } from "../../../db/schema";
 const categories = new Set(["Learning", "Artifact Creation", "Opportunity Development", "Automation & Leverage", "Work & Domain Depth", "Reflection & Optimization"]);
@@ -9,17 +8,13 @@ function clean(value: unknown, max = 500) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
-export async function GET(request: Request) {
-  const denied = unauthorized(request);
-  if (denied) return denied;
+export async function GET() {
   await ensureStorage();
   const items = await getDb().select().from(backlogItems).where(eq(backlogItems.status, "open")).orderBy(desc(backlogItems.createdAt));
   return Response.json({ items });
 }
 
 export async function POST(request: Request) {
-  const denied = unauthorized(request);
-  if (denied) return denied;
   await ensureStorage();
   const payload = (await request.json()) as Partial<NewBacklogItem>;
   const title = clean(payload.title);
@@ -40,8 +35,6 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const denied = unauthorized(request);
-  if (denied) return denied;
   await ensureStorage();
   const payload = (await request.json()) as { id?: string; status?: string; title?: string; category?: string; energy?: string; minutes?: number; expectedOutput?: string };
   if (!payload.id) return Response.json({ error: "Item id is required." }, { status: 400 });
@@ -79,8 +72,6 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const denied = unauthorized(request);
-  if (denied) return denied;
   await ensureStorage();
   const payload = (await request.json()) as { id?: string };
   const id = clean(payload.id, 100);

@@ -1,5 +1,4 @@
 import { desc, eq } from "drizzle-orm";
-import { unauthorized } from "../../api-auth";
 import { ensureStorage, getDb } from "../../../db";
 import { codexTasks, type NewCodexTask } from "../../../db/schema";
 
@@ -19,8 +18,6 @@ function errorMessage(error: unknown) {
 }
 
 export async function GET(request: Request) {
-  const denied = unauthorized(request);
-  if (denied) return denied;
   try {
     await ensureStorage();
     const params = new URL(request.url).searchParams;
@@ -36,8 +33,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const denied = unauthorized(request);
-  if (denied) return denied;
   try {
     await ensureStorage();
     const payload = (await request.json()) as TaskPayload;
@@ -67,8 +62,6 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const denied = unauthorized(request);
-  if (denied) return denied;
   try {
     await ensureStorage();
     const payload = (await request.json()) as TaskPayload;
@@ -101,8 +94,6 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const denied = unauthorized(request);
-  if (denied) return denied;
   try {
     await ensureStorage();
     const payload = (await request.json()) as TaskPayload;

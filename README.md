@@ -90,7 +90,7 @@ GitHub Actions runs type-check, lint, build, and the rendered-HTML test suite on
 
 ## Access, backup, and runner setup
 
-- **API access:** every `/api/*` route returns `401` unless the request carries the hosting-injected `oai-authenticated-user-id` header (signed-in browser) or `OAI-Sites-Authorization` (Capital Runner). `localhost` is allowed for development. These headers are trusted only because Sites hosting sits in front of the Worker; don't expose the Worker any other way.
+- **API access:** the Site is owner-private, so Sites hosting rejects every request that isn't you signed in or the Capital Runner's bypass token (which hosting consumes before the app sees it). The app adds no auth of its own; never change the Site's audience to public.
 - **Backup:** History → *Backup ↓* downloads all hours, backlog items, and tasks as JSON (`GET /api/backup`). *Restore ↑* re-imports a backup (`POST /api/backup`); rows whose id already exists are skipped, so restoring twice is safe.
 - **Deploy:** `npm run build` packages `dist/` plus `.openai/hosting.json` and `drizzle/` migrations for Sites hosting (D1 binding `DB`).
 - **Runner credential:** create the Keychain entry once, then install:

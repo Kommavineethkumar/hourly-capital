@@ -1,12 +1,9 @@
-import { unauthorized } from "../../api-auth";
 import { ensureStorage, getDb } from "../../../db";
 import { backlogItems, codexTasks, hours } from "../../../db/schema";
 
 type Backup = { version?: number; hours?: unknown[]; backlog?: unknown[]; tasks?: unknown[] };
 
-export async function GET(request: Request) {
-  const denied = unauthorized(request);
-  if (denied) return denied;
+export async function GET() {
   try {
     await ensureStorage();
     const db = getDb();
@@ -19,8 +16,6 @@ export async function GET(request: Request) {
 
 // Restores a backup. Existing rows with the same id are kept (insert-or-ignore), so re-importing is safe.
 export async function POST(request: Request) {
-  const denied = unauthorized(request);
-  if (denied) return denied;
   let payload: Backup;
   try {
     payload = (await request.json()) as Backup;
