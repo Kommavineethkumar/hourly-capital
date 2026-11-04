@@ -2,15 +2,14 @@ import { eq } from "drizzle-orm";
 import { ensureStorage, getDb } from "../../../db";
 import { backlogItems, codexTasks, hours } from "../../../db/schema";
 
-// One-time migration helper: rows created before multi-user support have user_id = ''.
-// Only OWNER_EMAIL may claim them; afterwards this is a no-op.
-const OWNER_EMAIL = "kommavineethkumar@gmail.com";
+// TEMPORARY one-time migration helper: assigns rows created before multi-user support
+// (user_id = '') to the caller. Safe only while the Site is owner-private; delete this
+// route before the Site goes public.
 
 export async function POST(request: Request) {
   await ensureStorage();
   const userId = request.headers.get("oai-authenticated-user-id");
-  const email = request.headers.get("oai-authenticated-user-email")?.toLowerCase();
-  if (!userId || email !== OWNER_EMAIL) return Response.json({ error: "Only the site owner can claim legacy data." }, { status: 403 });
+  if (!userId) return Response.json({ error: "Sign in to claim legacy data." }, { status: 401 });
   const db = getDb();
   const [h, b, t] = await Promise.all([
     db.update(hours).set({ userId }).where(eq(hours.userId, "")).returning({ id: hours.id }),
