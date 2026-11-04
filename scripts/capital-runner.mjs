@@ -336,7 +336,7 @@ async function runCodexTask(task, api) {
     await api.update(task.id, "running", { statusMessage: "Starting a separate Codex task." });
     await server.start();
     const threadResult = await server.request("thread/start", {
-      model: "gpt-5.6-sol",
+      model: "gpt-6-luna",
       cwd,
       approvalPolicy: "never",
       sandbox: "workspace-write",
@@ -381,7 +381,7 @@ async function runCodexTask(task, api) {
       cwd,
       approvalPolicy: "never",
       sandboxPolicy: { type: "workspaceWrite", writableRoots: [cwd], networkAccess: true },
-      model: "gpt-5.6-sol",
+      model: "gpt-6-luna",
       effort: "medium",
       serviceTier: "priority",
       summary: "concise",
