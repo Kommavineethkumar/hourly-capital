@@ -51,6 +51,7 @@ export default function TasksView() {
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -202,7 +203,15 @@ export default function TasksView() {
                   </header>
                   <h2 id={`task-${task.id}`}>{task.title}</h2>
                   {task.instructions && <p className="task-instructions">{task.instructions}</p>}
-                  {task.statusMessage && <p className="task-message">{task.statusMessage}</p>}
+                  {task.statusMessage && (
+                    <div className="task-result">
+                      <button className="task-result-toggle" type="button" onClick={() => setExpandedId(expandedId === task.id ? null : task.id)} aria-expanded={expandedId === task.id}>
+                        {expandedId === task.id ? "Hide result" : "View result"}
+                        <span aria-hidden="true">{expandedId === task.id ? "×" : "→"}</span>
+                      </button>
+                      {expandedId === task.id && <p className="task-result-body">{task.statusMessage}</p>}
+                    </div>
+                  )}
                   <div className="task-meta" aria-label="Task preferences">
                     {task.usePriorContext && <span>Prior context</span>}
                     {task.useAside && <span>Aside enabled</span>}

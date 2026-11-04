@@ -9,7 +9,7 @@ const DEFAULT_API_URL = "https://hourly-capital.vineethkumar-k-14679.chatgpt.sit
 const DEFAULT_CWD = "/Users/vineeth-14679/Documents/Vinny/projects";
 const KEYCHAIN_SERVICE = "Capital Runner";
 const DEFAULT_INTERVAL_SECONDS = 5;
-const MAX_STATUS_LENGTH = 1_000;
+const MAX_STATUS_LENGTH = 4_000;
 
 function usage() {
   return [

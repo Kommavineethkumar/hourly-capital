@@ -77,6 +77,10 @@ npm run runner:once
 ## Privacy model
 
 - The current Sites deployment is owner-only. If it is ever shared or made public, every visitor would use the same dataset because this version is intentionally single-user and does not partition records by account.
+
+## Continuous integration
+
+GitHub Actions runs type-check, lint, build, and the rendered-HTML test suite on every push and pull request to `main` (`.github/workflows/ci.yml`). Deployment to Cloudflare remains manual via the ChatGPT Sites hosting flow; CI verifies but does not deploy.
 - Capital stores task instructions and information entered deliberately through the product.
 - It does not collect active applications, browser history, IDE activity, terminal activity, or other passive context.
 - CSV export is generated locally in the browser from the records already loaded into the product.

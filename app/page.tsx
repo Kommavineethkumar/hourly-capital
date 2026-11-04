@@ -26,6 +26,8 @@ type Hour = {
   focus: number | null;
   energy: string | null;
   interruptions: number;
+  notes: string;
+  followUp: string;
   workMode: string;
   status: string;
 };
@@ -96,6 +98,23 @@ export default function Home() {
   const [focus, setFocus] = useState<number | null>(null);
   const [energy, setEnergy] = useState("");
   const [interruptions, setInterruptions] = useState(0);
+  const [notes, setNotes] = useState("");
+  const [followUp, setFollowUp] = useState("");
+  const [editingHour, setEditingHour] = useState<Hour | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchCategory, setSearchCategory] = useState("");
+  const [searchFrom, setSearchFrom] = useState("");
+  const [searchTo, setSearchTo] = useState("");
+  const [historyPage, setHistoryPage] = useState(0);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const historyPageSize = 50;
+  const [editingBacklogId, setEditingBacklogId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editCategory, setEditCategory] = useState("Learning");
+  const [editEnergy, setEditEnergy] = useState("Medium");
+  const [editMinutes, setEditMinutes] = useState(60);
+  const [editExpectedOutput, setEditExpectedOutput] = useState("");
   const [idea, setIdea] = useState("");
   const [ideaCategory, setIdeaCategory] = useState("Learning");
   const [ideaOutput, setIdeaOutput] = useState("");
@@ -117,7 +136,7 @@ export default function Home() {
         if (active) setClosing(true);
         else window.setTimeout(() => intentionRef.current?.focus(), 0);
       }
-      if (event.key === "Escape") setClosing(false);
+      if (event.key === "Escape") { setClosing(false); setEditingHour(null); }
     };
     window.addEventListener("keydown", shortcut);
     return () => {
@@ -127,17 +146,14 @@ export default function Home() {
   }, [active]);
 
   useEffect(() => {
-    Promise.all([fetch(`/api/hours?date=${today}`), fetch("/api/hours"), fetch("/api/backlog")])
+    Promise.all([fetch(`/api/hours?date=${today}`), fetch("/api/backlog")])
       .then(async (response) => {
-        const [todayResponse, historyResponse, backlogResponse] = response;
+        const [todayResponse, backlogResponse] = response;
         const todayData = (await todayResponse.json()) as { hours: Hour[]; error?: string };
-        const historyData = (await historyResponse.json()) as { hours: Hour[]; error?: string };
         const backlogData = (await backlogResponse.json()) as { items: BacklogItem[]; error?: string };
         if (!todayResponse.ok) throw new Error(todayData.error || "Could not load today.");
-        if (!historyResponse.ok) throw new Error(historyData.error || "Could not load history.");
         if (!backlogResponse.ok) throw new Error(backlogData.error || "Could not load backlog.");
         setHours(todayData.hours);
-        setHistory(historyData.hours);
         setBacklog(backlogData.items);
       })
       .catch((reason) => setError(reason.message))
@@ -145,8 +161,31 @@ export default function Home() {
   }, [today]);
 
   useEffect(() => {
-    if (closing) window.setTimeout(() => actualRef.current?.focus(), 0);
-  }, [closing]);
+    let cancelled = false;
+    const params = new URLSearchParams({ limit: String(historyPageSize), offset: String(historyPage * historyPageSize) });
+    if (searchQuery.trim()) params.set("q", searchQuery.trim());
+    if (searchCategory) params.set("category", searchCategory);
+    if (searchFrom) params.set("from", searchFrom);
+    if (searchTo) params.set("to", searchTo);
+    const timer = window.setTimeout(() => {
+      setHistoryLoading(true);
+      fetch(`/api/hours?${params}`)
+        .then(async (response) => {
+          const data = (await response.json()) as { hours: Hour[]; total?: number; error?: string };
+          if (!response.ok) throw new Error(data.error || "Could not load history.");
+          if (cancelled) return;
+          setHistory(data.hours);
+          setHistoryTotal(data.total ?? data.hours.length);
+        })
+        .catch((reason) => { if (!cancelled) setError(reason instanceof Error ? reason.message : "Could not load history."); })
+        .finally(() => { if (!cancelled) setHistoryLoading(false); });
+    }, 250);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [searchQuery, searchCategory, searchFrom, searchTo, historyPage]);
+
+  useEffect(() => {
+    if (closing || editingHour) window.setTimeout(() => actualRef.current?.focus(), 0);
+  }, [closing, editingHour]);
 
   async function startHour(event: FormEvent) {
     event.preventDefault();
@@ -181,7 +220,8 @@ export default function Home() {
 
   async function closeHour(event: FormEvent) {
     event.preventDefault();
-    if (!active || !actualActivity.trim() || saving) return;
+    const target = editingHour ?? active;
+    if (!target || !actualActivity.trim() || saving) return;
     setSaving(true);
     setError("");
     try {
@@ -189,14 +229,16 @@ export default function Home() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: active.id,
-          endTime: clock(now),
+          id: target.id,
+          endTime: editingHour ? editingHour.endTime ?? clock(now) : clock(now),
           actualActivity,
           output,
           score,
           focus,
           energy,
           interruptions,
+          notes,
+          followUp,
         }),
       });
       const data = (await response.json()) as { hour: Hour; error?: string };
@@ -210,6 +252,9 @@ export default function Home() {
       setScore(null);
       setFocus(null);
       setEnergy("");
+      setNotes("");
+      setFollowUp("");
+      setEditingHour(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not close the hour.");
     } finally {
@@ -240,9 +285,64 @@ export default function Home() {
     window.setTimeout(() => intentionRef.current?.focus(), 0);
   }
 
+  function editIdea(item: BacklogItem) {
+    setEditingBacklogId(item.id);
+    setEditTitle(item.title);
+    setEditCategory(item.category);
+    setEditEnergy(item.energy);
+    setEditMinutes(item.minutes);
+    setEditExpectedOutput(item.expectedOutput);
+  }
+
+  async function saveBacklogEdit(item: BacklogItem) {
+    if (!editTitle.trim() || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/backlog", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: item.id, title: editTitle, category: editCategory, energy: editEnergy, minutes: editMinutes, expectedOutput: editExpectedOutput }) });
+      const data = (await response.json()) as { item?: BacklogItem; error?: string };
+      if (!response.ok || !data.item) throw new Error(data.error || "Could not save.");
+      const saved = data.item;
+      setBacklog((current) => current.map((entry) => entry.id === item.id ? saved : entry));
+      setEditingBacklogId(null);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not save.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteBacklogItem(item: BacklogItem) {
+    if (!window.confirm(`Remove "${item.title}" from the backlog?`)) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/backlog", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: item.id }) });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error || "Could not remove.");
+      setBacklog((current) => current.filter((entry) => entry.id !== item.id));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not remove.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function completeIdea(item: BacklogItem) {
     const response = await fetch("/api/backlog", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: item.id, status: "done" }) });
     if (response.ok) setBacklog((current) => current.filter((entry) => entry.id !== item.id));
+  }
+
+  function editHour(hour: Hour) {
+    setEditingHour(hour);
+    setActualActivity(hour.actualActivity);
+    setOutput(hour.output);
+    setScore(hour.score);
+    setFocus(hour.focus);
+    setEnergy(hour.energy ?? "");
+    setInterruptions(hour.interruptions);
+    setNotes(hour.notes);
+    setFollowUp(hour.followUp);
   }
 
   async function removeHour(hour: Hour) {
@@ -262,6 +362,7 @@ export default function Home() {
       setHours((current) => current.filter((entry) => entry.id !== hour.id));
       setHistory((current) => current.filter((entry) => entry.id !== hour.id));
       if (active?.id === hour.id) setClosing(false);
+      if (editingHour?.id === hour.id) setEditingHour(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not remove the entry.");
     } finally {
@@ -430,8 +531,12 @@ export default function Home() {
                         <div><span className={`tag ${colors[hour.category]}`}>{hour.category}</span>{hour.score !== null && <span className="score">{hour.score} · {scoreNames[hour.score]}</span>}</div>
                         <h3>{hour.intention}</h3>
                         {hour.output && <p><b>Output</b> {hour.output}</p>}
+                        {hour.followUp && <p className="follow-up-badge"><span>→</span> {hour.followUp}</p>}
                       </div>
-                      <button className="remove-entry" type="button" disabled={deletingId === hour.id} onClick={() => removeHour(hour)} aria-label={`Remove ${hour.intention} from timeline`}>{deletingId === hour.id ? "Removing…" : "Remove"}</button>
+                      <div className="entry-actions">
+                        {hour.status === "completed" && <button className="edit-entry" type="button" onClick={() => editHour(hour)} aria-label={`Edit ${hour.intention}`}>Edit</button>}
+                        <button className="remove-entry" type="button" disabled={deletingId === hour.id} onClick={() => removeHour(hour)} aria-label={`Remove ${hour.intention} from timeline`}>{deletingId === hour.id ? "Removing…" : "Remove"}</button>
+                      </div>
                     </article>
                   ))}
                 </div>
@@ -517,40 +622,91 @@ export default function Home() {
             </div>
           </form>
           <div className="backlog-grid">
-            {backlog.length ? backlog.map((item) => <article className="backlog-card card" key={item.id}><div className="tag-row"><span className={`tag ${colors[item.category]}`}>{item.category}</span><span className="tag neutral">{item.minutes} min · {item.energy} energy</span></div><h2>{item.title}</h2>{item.expectedOutput && <p>{item.expectedOutput}</p>}<div><button className="secondary" onClick={() => completeIdea(item)}>Done</button><button className="primary dark" onClick={() => planIdea(item)}>Plan this <span>→</span></button></div></article>) : <div className="empty-state"><strong>No opportunities waiting.</strong><span>Add a learning question, artifact, automation idea, or role to explore.</span></div>}
+            {backlog.length ? backlog.map((item) => editingBacklogId === item.id ? (
+              <form className="backlog-card card backlog-inline-edit" key={item.id} onSubmit={(event) => { event.preventDefault(); void saveBacklogEdit(item); }}>
+                <label htmlFor={`edit-title-${item.id}`}>Title
+                  <input id={`edit-title-${item.id}`} value={editTitle} onChange={(event) => setEditTitle(event.target.value)} required />
+                </label>
+                <div className="edit-backlog-row">
+                  <label className="select-field">Category<select value={editCategory} onChange={(event) => setEditCategory(event.target.value)}>{categories.map(([name]) => <option key={name}>{name}</option>)}</select><span className="select-arrow" aria-hidden="true">⌄</span></label>
+                  <label className="select-field">Energy<select value={editEnergy} onChange={(event) => setEditEnergy(event.target.value)}><option>Low</option><option>Medium</option><option>High</option></select><span className="select-arrow" aria-hidden="true">⌄</span></label>
+                  <label className="select-field">Min<select value={editMinutes} onChange={(event) => setEditMinutes(Number(event.target.value))}><option value={30}>30</option><option value={45}>45</option><option value={60}>60</option><option value={90}>90</option></select><span className="select-arrow" aria-hidden="true">⌄</span></label>
+                </div>
+                <label htmlFor={`edit-output-${item.id}`}>Expected output <span>optional</span>
+                  <input id={`edit-output-${item.id}`} value={editExpectedOutput} onChange={(event) => setEditExpectedOutput(event.target.value)} />
+                </label>
+                <div>
+                  <button className="primary" disabled={saving}>{saving ? "Saving…" : "Save"}<span>✓</span></button>
+                  <button className="secondary" type="button" onClick={() => setEditingBacklogId(null)}>Cancel</button>
+                </div>
+              </form>
+            ) : (
+              <article className="backlog-card card" key={item.id}>
+                <div className="tag-row"><span className={`tag ${colors[item.category]}`}>{item.category}</span><span className="tag neutral">{item.minutes} min · {item.energy} energy</span></div>
+                <h2>{item.title}</h2>
+                {item.expectedOutput && <p>{item.expectedOutput}</p>}
+                <div>
+                  <button className="secondary" onClick={() => completeIdea(item)}>Done</button>
+                  <button className="secondary" onClick={() => editIdea(item)}>Edit</button>
+                  <button className="secondary danger" onClick={() => deleteBacklogItem(item)}>Delete</button>
+                  <button className="primary dark" onClick={() => planIdea(item)}>Plan this <span>→</span></button>
+                </div>
+              </article>
+            )) : <div className="empty-state"><strong>No opportunities waiting.</strong><span>Add a learning question, artifact, automation idea, or role to explore.</span></div>}
           </div>
         </section>
       ) : (
         <section className="history-page">
           <div className="review-heading history-heading"><div><p className="eyebrow">Your evidence archive</p><h1>History, without surveillance.</h1><p>Only the hours and outcomes you deliberately recorded.</p></div><button className="secondary" onClick={() => exportCsv(history)}>Export CSV ↓</button></div>
-          {historyGroups.length ? historyGroups.map(([date, records]) => (
+          <form className="history-search card" onSubmit={(event) => event.preventDefault()}>
+            <input aria-label="Search history" value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setHistoryPage(0); }} placeholder="Search intention, activity, output, notes…" />
+            <label className="select-field">Category<select value={searchCategory} onChange={(event) => { setSearchCategory(event.target.value); setHistoryPage(0); }}><option value="">All categories</option>{categories.map(([name]) => <option key={name}>{name}</option>)}</select><span className="select-arrow" aria-hidden="true">⌄</span></label>
+            <label className="select-field">From<input type="date" value={searchFrom} onChange={(event) => { setSearchFrom(event.target.value); setHistoryPage(0); }} /></label>
+            <label className="select-field">To<input type="date" value={searchTo} onChange={(event) => { setSearchTo(event.target.value); setHistoryPage(0); }} /></label>
+            {(searchQuery || searchCategory || searchFrom || searchTo) && <button className="secondary" type="button" onClick={() => { setSearchQuery(""); setSearchCategory(""); setSearchFrom(""); setSearchTo(""); setHistoryPage(0); }}>Clear</button>}
+          </form>
+          {historyLoading ? <div className="empty-state">Loading history…</div> : historyGroups.length ? historyGroups.map(([date, records]) => (
             <article className="history-day card" key={date}>
               <header><div><p className="eyebrow">{new Date(`${date}T12:00:00`).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}</p><h2>{records.filter((hour) => hour.output).length} outputs from {records.length} hours</h2></div><strong>{records.filter((hour) => hour.score === 3).length} compounding</strong></header>
-              {records.sort((a, b) => b.startTime.localeCompare(a.startTime)).map((hour) => <div className="history-record" key={hour.id}><span className="history-time">{hour.startTime}</span><span className={`category-mark ${colors[hour.category]}`}>{categories.find(([name]) => name === hour.category)?.[2] ?? "·"}</span><div><h3>{hour.intention}</h3><p>{hour.output || hour.actualActivity}</p></div><span className="history-score">{hour.score ?? "—"} / 3</span><button className="remove-entry" type="button" disabled={deletingId === hour.id} onClick={() => removeHour(hour)} aria-label={`Remove ${hour.intention} from history`}>{deletingId === hour.id ? "Removing…" : "Remove"}</button></div>)}
+              {records.sort((a, b) => b.startTime.localeCompare(a.startTime)).map((hour) => <div className="history-record" key={hour.id}><span className="history-time">{hour.startTime}</span><span className={`category-mark ${colors[hour.category]}`}>{categories.find(([name]) => name === hour.category)?.[2] ?? "·"}</span><div><h3>{hour.intention}</h3><p>{hour.output || hour.actualActivity}</p></div><span className="history-score">{hour.score ?? "—"} / 3</span><div className="entry-actions"><button className="edit-entry" type="button" onClick={() => editHour(hour)} aria-label={`Edit ${hour.intention}`}>Edit</button><button className="remove-entry" type="button" disabled={deletingId === hour.id} onClick={() => removeHour(hour)} aria-label={`Remove ${hour.intention} from history`}>{deletingId === hour.id ? "Removing…" : "Remove"}</button></div></div>)}
             </article>
-          )) : <div className="empty-state"><strong>No history yet.</strong><span>Your completed hours will collect here.</span></div>}
+          )) : <div className="empty-state"><strong>No matching hours.</strong><span>Adjust the search or record hours to build your archive.</span></div>}
+          <div className="history-pager">
+            {historyTotal > historyPageSize && (
+              <>
+                <button className="secondary" type="button" disabled={historyPage === 0 || historyLoading} onClick={() => setHistoryPage((page) => Math.max(0, page - 1))}>← Newer</button>
+                <span>Page {historyPage + 1} of {Math.max(1, Math.ceil(historyTotal / historyPageSize))} · {historyTotal} records</span>
+                <button className="secondary" type="button" disabled={(historyPage + 1) * historyPageSize >= historyTotal || historyLoading} onClick={() => setHistoryPage((page) => page + 1)}>Older →</button>
+              </>
+            )}
+            {historyTotal <= historyPageSize && historyTotal > 0 && <span>{historyTotal} records</span>}
+          </div>
         </section>
       )}
 
-      {closing && active && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setClosing(false)}>
+      {(() => { const modalHour = editingHour ?? (closing && active ? active : null); return modalHour ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setClosing(false); setEditingHour(null); } }}>
           <form className="close-modal" onSubmit={closeHour} role="dialog" aria-modal="true" aria-labelledby="close-title">
-            <button className="modal-x" type="button" onClick={() => setClosing(false)} aria-label="Close">×</button>
-            <p className="eyebrow">Close the loop · {active.startTime}–{clock(now)}</p>
-            <h2 id="close-title">What actually happened?</h2>
-            <p className="modal-intention">Planned: {active.intention}</p>
+            <button className="modal-x" type="button" onClick={() => { setClosing(false); setEditingHour(null); }} aria-label="Close">×</button>
+            <p className="eyebrow">{editingHour ? "Edit hour" : "Close the loop"} · {modalHour.startTime}–{modalHour.endTime || clock(now)}</p>
+            <h2 id="close-title">{editingHour ? "Revise this hour." : "What actually happened?"}</h2>
+            <p className="modal-intention">Planned: {modalHour.intention}</p>
             <label htmlFor="actual">Actual activity</label>
             <textarea id="actual" ref={actualRef} value={actualActivity} onChange={(event) => setActualActivity(event.target.value)} rows={2} placeholder="What did you actually spend the hour doing?" required />
             <label htmlFor="output">Output or evidence <span>optional</span></label>
             <input id="output" value={output} onChange={(event) => setOutput(event.target.value)} placeholder="What exists, changed, or became clear?" />
+            <label htmlFor="notes">Notes <span>optional</span></label>
+            <textarea id="notes" value={notes} onChange={(event) => setNotes(event.target.value)} rows={2} placeholder="Anything worth remembering about this hour — context, blockers, impressions." />
+            <label htmlFor="followUp">Follow-up <span>optional</span></label>
+            <input id="followUp" value={followUp} onChange={(event) => setFollowUp(event.target.value)} placeholder="A question, action, or topic to revisit." />
             <div className="close-row">
               <fieldset><legend>Value <span>optional</span></legend><div className="segmented">{scoreNames.map((name, index) => <button key={name} type="button" aria-pressed={score === index} className={score === index ? "selected" : ""} onClick={() => setScore(score === index ? null : index)}><b>{index}</b><span>{name}</span></button>)}</div></fieldset>
               <fieldset><legend>Focus <span>optional</span></legend><div className="focus-buttons">{[1, 2, 3, 4, 5].map((value) => <button key={value} type="button" aria-pressed={focus === value} className={focus === value ? "selected" : ""} onClick={() => setFocus(focus === value ? null : value)}>{value}</button>)}</div></fieldset>
             </div>
-            <div className="modal-footer"><div className="footer-fields"><label className="select-field">Energy <span>optional</span><select value={energy} onChange={(event) => setEnergy(event.target.value)}><option value="">Not set</option><option>Low</option><option>Medium</option><option>High</option></select><span className="select-arrow" aria-hidden="true">⌄</span></label><label className="select-field">Interruptions <select value={interruptions} onChange={(event) => setInterruptions(Number(event.target.value))}><option value={0}>None</option><option value={1}>One</option><option value={2}>Two</option><option value={3}>Three+</option></select><span className="select-arrow" aria-hidden="true">⌄</span></label></div><button className="primary" disabled={saving || !actualActivity.trim()}>{saving ? "Saving…" : "Save & close hour"}<span>✓</span></button></div>
+            <div className="modal-footer"><div className="footer-fields"><label className="select-field">Energy <span>optional</span><select value={energy} onChange={(event) => setEnergy(event.target.value)}><option value="">Not set</option><option>Low</option><option>Medium</option><option>High</option></select><span className="select-arrow" aria-hidden="true">⌄</span></label><label className="select-field">Interruptions <select value={interruptions} onChange={(event) => setInterruptions(Number(event.target.value))}><option value={0}>None</option><option value={1}>One</option><option value={2}>Two</option><option value={3}>Three+</option></select><span className="select-arrow" aria-hidden="true">⌄</span></label></div><button className="primary" disabled={saving || !actualActivity.trim()}>{saving ? "Saving…" : editingHour ? "Save changes" : "Save & close hour"}<span>✓</span></button></div>
           </form>
         </div>
-      )}
+      ) : null; })()}
     </main>
   );
 }

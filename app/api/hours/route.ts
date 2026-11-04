@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, and, like, or, gte, lte, sql } from "drizzle-orm";
 import { ensureStorage, getDb } from "../../../db";
 import { hours, type NewHour } from "../../../db/schema";
 
@@ -20,15 +20,57 @@ function errorMessage(error: unknown) {
     : "Capital could not complete that request.";
 }
 
+const searchClean = (value: string | null, max = 100) => (value ?? "").trim().slice(0, max);
+
 export async function GET(request: Request) {
   try {
     await ensureStorage();
-    const date = new URL(request.url).searchParams.get("date");
+    const params = new URL(request.url).searchParams;
+    const date = params.get("date");
     const db = getDb();
-    const rows = date
-      ? await db.select().from(hours).where(eq(hours.date, date)).orderBy(desc(hours.startTime))
-      : await db.select().from(hours).orderBy(desc(hours.createdAt)).limit(100);
-    return Response.json({ hours: rows });
+
+    if (date) {
+      const rows = await db.select().from(hours).where(eq(hours.date, date)).orderBy(desc(hours.startTime));
+      return Response.json({ hours: rows });
+    }
+
+    const limitParam = Number(searchClean(params.get("limit"), 6));
+    const offsetParam = Number(searchClean(params.get("offset"), 8));
+    const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 200) : 100;
+    const offset = Number.isInteger(offsetParam) && offsetParam >= 0 ? offsetParam : 0;
+
+    const keyword = searchClean(params.get("q"));
+    const category = searchClean(params.get("category"), 80);
+    const from = searchClean(params.get("from"), 10);
+    const to = searchClean(params.get("to"), 10);
+
+    const conditions = [];
+    if (keyword) {
+      const pattern = `%${keyword}%`;
+      conditions.push(or(like(hours.intention, pattern), like(hours.actualActivity, pattern), like(hours.output, pattern), like(hours.expectedOutput, pattern), like(hours.notes, pattern)));
+    }
+    if (category) {
+      if (!categories.has(category)) return Response.json({ error: "Category is invalid." }, { status: 400 });
+      conditions.push(eq(hours.category, category));
+    }
+    if (from && datePattern.test(from)) conditions.push(gte(hours.date, from));
+    if (to && datePattern.test(to)) conditions.push(lte(hours.date, to));
+
+    const filter = conditions.length ? and(...conditions) : undefined;
+    const base = db.select().from(hours).$dynamic();
+    const rows = await base
+      .where(filter)
+      .orderBy(desc(hours.date), desc(hours.startTime))
+      .limit(limit)
+      .offset(offset);
+
+    const countRows = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(hours)
+      .where(filter);
+    const total = countRows[0]?.count ?? rows.length;
+
+    return Response.json({ hours: rows, total });
   } catch (error) {
     return Response.json({ error: errorMessage(error) }, { status: 500 });
   }

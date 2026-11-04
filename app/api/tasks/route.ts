@@ -73,7 +73,7 @@ export async function PATCH(request: Request) {
       ...(status === "completed" || status === "failed" || status === "cancelled" ? { completedAt: now } : {}),
     };
     if ("codexThreadId" in payload) update.codexThreadId = clean(payload.codexThreadId, 200) || null;
-    if ("statusMessage" in payload) update.statusMessage = clean(payload.statusMessage, 1_000);
+    if ("statusMessage" in payload) update.statusMessage = clean(payload.statusMessage, 4_000);
 
     const [task] = await getDb()
       .update(codexTasks)

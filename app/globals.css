@@ -129,6 +129,11 @@ kbd { padding: 3px 7px; background: #f0efeb; border: 1px solid #deddd8; border-r
 .timeline-copy h3 { margin: 9px 0 6px; font-size: 14px; line-height: 1.4; }
 .timeline-copy p { color: #73746e; margin: 0; font-size: 12px; }
 .timeline-copy p b { color: #555650; margin-right: 5px; }
+.follow-up-badge { color: #70716b; font-size: 11px; margin-top: 2px; }
+.entry-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.edit-entry { border: 0; background: transparent; color: #6b6c66; padding: 4px 0 4px 8px; font-size: 10px; font-weight: 700; cursor: pointer; }
+.edit-entry:hover, .edit-entry:focus-visible { color: #1b1b18; text-decoration: underline; }
+.follow-up-badge span { font-size: 10px; margin-right: 2px; }
 .remove-entry { align-self: start; border: 0; background: transparent; color: #9a6666; padding: 4px 0 4px 8px; font-size: 10px; font-weight: 700; cursor: pointer; }
 .remove-entry:hover, .remove-entry:focus-visible { color: #9a3030; text-decoration: underline; }
 .remove-entry:disabled { opacity: .5; cursor: wait; }
@@ -180,6 +185,10 @@ kbd { padding: 3px 7px; background: #f0efeb; border: 1px solid #deddd8; border-r
 .week-row i { display: block; height: 100%; background: var(--accent); border-radius: 8px; }
 .week-row b { color: #777872; text-align: right; font-weight: 600; }
 .history-heading { display: flex; }
+.history-search { display: flex; gap: 10px; align-items: center; padding: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+.history-search input[type="date"] { padding: 8px 10px; border: 1px solid #d9d9d3; border-radius: 7px; background: #fbfbf8; }
+.history-search input[aria-label="Search history"] { flex: 1; min-width: 180px; padding: 10px 12px; border: 1px solid #d9d9d3; border-radius: 7px; background: #fbfbf8; font-size: 14px; text-transform: none; letter-spacing: 0; }
+.history-pager { display: flex; justify-content: center; align-items: center; gap: 14px; margin-top: 26px; color: #8d8e88; font-size: 12px; }
 .secondary { height: 43px; padding: 0 16px; border: 1px solid #d7d6d0; border-radius: 7px; background: white; font-size: 12px; font-weight: 700; cursor: pointer; }
 .history-day { margin-bottom: 16px; overflow: hidden; }
 .history-day > header { display: flex; justify-content: space-between; align-items: center; padding: 23px 26px; background: #eeece7; border-bottom: 1px solid var(--line); }
@@ -204,6 +213,13 @@ kbd { padding: 3px 7px; background: #f0efeb; border: 1px solid #deddd8; border-r
 .backlog-card > p { color: #858680; font-size: 12px; }
 .backlog-card > div:last-child { display: flex; align-items: center; gap: 8px; margin-top: auto; }
 .backlog-card .primary { margin-left: auto; min-width: 130px; }
+.backlog-inline-edit { display: flex; flex-direction: column; gap: 12px; padding: 22px; }
+.backlog-inline-edit label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .12em; }
+.backlog-inline-edit input { display: block; margin-top: 6px; padding: 8px 11px; border: 1px solid #d9d9d3; border-radius: 7px; background: #fbfbf8; color: var(--ink); font-size: 14px; width: 100%; }
+.edit-backlog-row { display: flex; gap: 8px; }
+.edit-backlog-row .select-field { flex: 1; }
+.danger { color: #9a6666; border-color: #e2d7d7; }
+.danger:hover, .danger:focus-visible { color: #9a3030; background: #fef2f2; border-color: #9a6666; }
 
 .tasks-page { max-width: 1180px; margin: 0 auto 80px; }
 .task-form { padding: 28px; margin-bottom: 22px; }
@@ -247,6 +263,11 @@ kbd { padding: 3px 7px; background: #f0efeb; border: 1px solid #deddd8; border-r
 .task-actions .secondary { min-width: 100px; }
 .task-thread-link { display: inline-flex; align-items: center; justify-content: center; color: inherit; text-decoration: none; }
 .task-remove { margin-left: auto; color: #915858; }
+.task-result { margin: 8px 0; }
+.task-result-toggle { border: 0; background: transparent; color: #555650; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; cursor: pointer; padding: 2px 0; }
+.task-result-toggle:hover, .task-result-toggle:focus-visible { text-decoration: underline; }
+.task-result-toggle span { margin-left: 4px; }
+.task-result-body { margin: 8px 0; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: #f7f6f2; color: #3f403a; font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid #7770bf66; outline-offset: 2px; }
 
