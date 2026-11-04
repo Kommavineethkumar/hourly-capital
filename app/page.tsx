@@ -457,7 +457,7 @@ export default function Home() {
           <button aria-current={view === "backlog" ? "page" : undefined} className={view === "backlog" ? "active" : ""} onClick={() => setView("backlog")}>Backlog</button>
           <button aria-current={view === "history" ? "page" : undefined} className={view === "history" ? "active" : ""} onClick={() => setView("history")}>History</button>
         </nav>
-        <div className="privacy"><span /> Owner-only deployment</div>
+        <div className="privacy"><span /> Your data is private to your account</div>
       </header>
 
       {error && <div className="error-banner" role="alert">{error}</div>}

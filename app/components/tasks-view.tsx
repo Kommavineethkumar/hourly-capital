@@ -1,5 +1,6 @@
 "use client";
 
+import RunnerTokens from "./runner-tokens";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type TaskStatus = "inbox" | "queued" | "running" | "needs_input" | "completed" | "failed" | "cancelled";
@@ -230,6 +231,7 @@ export default function TasksView() {
       ) : (
         <div className="empty-state"><strong>No tasks yet.</strong><span>Add work above and Capital will keep the high-level status here.</span></div>
       )}
+      <RunnerTokens />
     </section>
   );
 }

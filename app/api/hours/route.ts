@@ -1,4 +1,5 @@
 import { desc, eq, and, like, or, gte, lte, sql } from "drizzle-orm";
+import { currentUserId, unauthorized } from "../../api-user";
 import { ensureStorage, getDb } from "../../../db";
 import { hours, type NewHour } from "../../../db/schema";
 
@@ -25,12 +26,14 @@ const searchClean = (value: string | null, max = 100) => (value ?? "").trim().sl
 export async function GET(request: Request) {
   try {
     await ensureStorage();
+    const userId = await currentUserId(request);
+    if (!userId) return unauthorized();
     const params = new URL(request.url).searchParams;
     const date = params.get("date");
     const db = getDb();
 
     if (date) {
-      const rows = await db.select().from(hours).where(eq(hours.date, date)).orderBy(desc(hours.startTime));
+      const rows = await db.select().from(hours).where(and(eq(hours.userId, userId), eq(hours.date, date))).orderBy(desc(hours.startTime));
       return Response.json({ hours: rows });
     }
 
@@ -44,10 +47,10 @@ export async function GET(request: Request) {
     const from = searchClean(params.get("from"), 10);
     const to = searchClean(params.get("to"), 10);
 
-    const conditions = [];
+    const conditions = [eq(hours.userId, userId)];
     if (keyword) {
       const pattern = `%${keyword}%`;
-      conditions.push(or(like(hours.intention, pattern), like(hours.actualActivity, pattern), like(hours.output, pattern), like(hours.expectedOutput, pattern), like(hours.notes, pattern)));
+      conditions.push(or(like(hours.intention, pattern), like(hours.actualActivity, pattern), like(hours.output, pattern), like(hours.expectedOutput, pattern), like(hours.notes, pattern))!);
     }
     if (category) {
       if (!categories.has(category)) return Response.json({ error: "Category is invalid." }, { status: 400 });
@@ -56,7 +59,7 @@ export async function GET(request: Request) {
     if (from && datePattern.test(from)) conditions.push(gte(hours.date, from));
     if (to && datePattern.test(to)) conditions.push(lte(hours.date, to));
 
-    const filter = conditions.length ? and(...conditions) : undefined;
+    const filter = and(...conditions);
     const base = db.select().from(hours).$dynamic();
     const rows = await base
       .where(filter)
@@ -79,6 +82,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     await ensureStorage();
+    const userId = await currentUserId(request);
+    if (!userId) return unauthorized();
     const payload = (await request.json()) as HourPayload;
     const intention = clean(payload.intention, 500);
     const category = clean(payload.category, 80);
@@ -95,6 +100,7 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
     const value: NewHour = {
       id: crypto.randomUUID(),
+      userId,
       date,
       startTime,
       intention,
@@ -118,6 +124,8 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     await ensureStorage();
+    const userId = await currentUserId(request);
+    if (!userId) return unauthorized();
     const payload = (await request.json()) as HourPayload;
     if (!payload.id) return Response.json({ error: "Hour id is required." }, { status: 400 });
     const endTime = clean(payload.endTime, 5);
@@ -144,7 +152,7 @@ export async function PATCH(request: Request) {
         status: "completed",
         updatedAt: now,
       })
-      .where(eq(hours.id, payload.id))
+      .where(and(eq(hours.id, payload.id), eq(hours.userId, userId)))
       .returning();
 
     if (!hour) return Response.json({ error: "Hour not found." }, { status: 404 });
@@ -157,11 +165,13 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     await ensureStorage();
+    const userId = await currentUserId(request);
+    if (!userId) return unauthorized();
     const payload = (await request.json()) as HourPayload;
     const id = clean(payload.id, 100);
     if (!id) return Response.json({ error: "Hour id is required." }, { status: 400 });
 
-    const [hour] = await getDb().delete(hours).where(eq(hours.id, id)).returning();
+    const [hour] = await getDb().delete(hours).where(and(eq(hours.id, id), eq(hours.userId, userId))).returning();
     if (!hour) return Response.json({ error: "Hour not found." }, { status: 404 });
     return Response.json({ hour });
   } catch (error) {

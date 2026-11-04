@@ -1,6 +1,10 @@
 #!/bin/sh
 set -eu
 
+# Usage: npm run runner:install -- --api-url https://<your-capital-site>
+API_URL=""
+if [ "${1:-}" = "--api-url" ]; then API_URL="${2:-}"; fi
+
 PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 RUNNER="$PROJECT_DIR/scripts/capital-runner.mjs"
 NODE_BIN=$(command -v node)
@@ -8,7 +12,7 @@ CODEX_BIN=$(command -v codex)
 ASIDE_BIN=$(command -v aside 2>/dev/null || true)
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 LOG_DIR="$HOME/.codex/log"
-PLIST="$LAUNCH_AGENTS_DIR/com.vinny.capital-runner.plist"
+PLIST="$LAUNCH_AGENTS_DIR/com.capital.runner.plist"
 DOMAIN="gui/$(id -u)"
 
 if [ ! -f "$RUNNER" ]; then
@@ -40,7 +44,7 @@ cat > "$PLIST" <<EOF
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.vinny.capital-runner</string>
+  <string>com.capital.runner</string>
   <key>ProgramArguments</key>
   <array>
     <string>$NODE_XML</string>
@@ -48,6 +52,7 @@ cat > "$PLIST" <<EOF
     <string>--watch</string>
     <string>--interval</string>
     <string>5</string>
+$( [ -n "$API_URL" ] && printf '    <string>--api-url</string>\n    <string>%s</string>\n' "$(xml_escape "$API_URL")" )
   </array>
   <key>WorkingDirectory</key>
   <string>$PROJECT_XML</string>
@@ -73,6 +78,6 @@ EOF
 plutil -lint "$PLIST" >/dev/null
 launchctl bootout "$DOMAIN" "$PLIST" >/dev/null 2>&1 || true
 launchctl bootstrap "$DOMAIN" "$PLIST"
-launchctl kickstart -k "$DOMAIN/com.vinny.capital-runner"
+launchctl kickstart -k "$DOMAIN/com.capital.runner"
 
 echo "Capital Runner installed and watching for queued tasks."

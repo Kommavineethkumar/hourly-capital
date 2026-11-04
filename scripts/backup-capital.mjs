@@ -4,11 +4,11 @@ import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
 
-const url = process.env.CAPITAL_URL ?? "https://hourly-capital.vineethkumar-k-14679.chatgpt.site";
+const url = process.env.CAPITAL_URL || "https://hourly-capital.vineethkumar-k-14679.chatgpt.site";
 const dir = process.env.CAPITAL_BACKUP_DIR ?? join(homedir(), "Documents", "Capital Backups");
 const token = execFileSync("security", ["find-generic-password", "-s", "Capital Runner", "-a", userInfo().username, "-w"]).toString().trim();
 
-const response = await fetch(`${url}/api/backup`, { headers: { "OAI-Sites-Authorization": `Bearer ${token}` }, signal: AbortSignal.timeout(60_000) });
+const response = await fetch(`${url}/api/backup`, { headers: { "X-Capital-Token": token }, signal: AbortSignal.timeout(60_000) });
 if (!response.ok) throw new Error(`Backup failed: HTTP ${response.status}`);
 const data = await response.json();
 await mkdir(dir, { recursive: true });

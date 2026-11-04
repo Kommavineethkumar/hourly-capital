@@ -1,4 +1,5 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
+import { currentUserId, unauthorized } from "../../api-user";
 import { ensureStorage, getDb } from "../../../db";
 import { codexTasks, type NewCodexTask } from "../../../db/schema";
 
@@ -20,12 +21,14 @@ function errorMessage(error: unknown) {
 export async function GET(request: Request) {
   try {
     await ensureStorage();
+    const userId = await currentUserId(request);
+    if (!userId) return unauthorized();
     const params = new URL(request.url).searchParams;
     const limitParam = Number(params.get("limit"));
     const offsetParam = Number(params.get("offset"));
     const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 500) : 200;
     const offset = Number.isInteger(offsetParam) && offsetParam >= 0 ? offsetParam : 0;
-    const tasks = await getDb().select().from(codexTasks).orderBy(desc(codexTasks.createdAt)).limit(limit + 1).offset(offset);
+    const tasks = await getDb().select().from(codexTasks).where(eq(codexTasks.userId, userId)).orderBy(desc(codexTasks.createdAt)).limit(limit + 1).offset(offset);
     return Response.json({ tasks: tasks.slice(0, limit), hasMore: tasks.length > limit });
   } catch (error) {
     return Response.json({ error: errorMessage(error) }, { status: 500 });
@@ -35,6 +38,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     await ensureStorage();
+    const userId = await currentUserId(request);
+    if (!userId) return unauthorized();
     const payload = (await request.json()) as TaskPayload;
     const title = clean(payload.title, 240);
     if (!title) return Response.json({ error: "Task title is required." }, { status: 400 });
@@ -43,6 +48,7 @@ export async function POST(request: Request) {
     const startImmediately = payload.startImmediately === true;
     const value: NewCodexTask = {
       id: crypto.randomUUID(),
+      userId,
       title,
       instructions: clean(payload.instructions, 8_000),
       status: startImmediately ? "queued" : "inbox",
@@ -64,6 +70,8 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     await ensureStorage();
+    const userId = await currentUserId(request);
+    if (!userId) return unauthorized();
     const payload = (await request.json()) as TaskPayload;
     const id = clean(payload.id, 100);
     const status = clean(payload.status, 30);
@@ -83,7 +91,7 @@ export async function PATCH(request: Request) {
     const [task] = await getDb()
       .update(codexTasks)
       .set(update)
-      .where(eq(codexTasks.id, id))
+      .where(and(eq(codexTasks.id, id), eq(codexTasks.userId, userId)))
       .returning();
 
     if (!task) return Response.json({ error: "Task not found." }, { status: 404 });
@@ -96,11 +104,13 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     await ensureStorage();
+    const userId = await currentUserId(request);
+    if (!userId) return unauthorized();
     const payload = (await request.json()) as TaskPayload;
     const id = clean(payload.id, 100);
     if (!id) return Response.json({ error: "Task id is required." }, { status: 400 });
 
-    const [task] = await getDb().delete(codexTasks).where(eq(codexTasks.id, id)).returning();
+    const [task] = await getDb().delete(codexTasks).where(and(eq(codexTasks.id, id), eq(codexTasks.userId, userId))).returning();
     if (!task) return Response.json({ error: "Task not found." }, { status: 404 });
     return Response.json({ task });
   } catch (error) {

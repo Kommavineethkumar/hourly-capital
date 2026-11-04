@@ -59,11 +59,15 @@ The hosted app stores the task queue. A small local runner watches that queue an
 
 The runner can attach a small, relevance-filtered context bundle from recent Codex, Claude Code, Pi, and Hermes sessions. It excludes reasoning traces, tool payloads, credentials, configuration files, and authentication data. When a task allows authenticated research, its Codex prompt directs the agent to the installed Aside Browser skill; it does not copy browser credentials into the task.
 
-The private Sites bypass credential is stored in macOS Keychain under the service `Capital Runner`. Install the background watcher after that credential has been created:
+Each user runs their own runner on their own Mac with their own Codex. In Capital, open **Tasks → Connect your Mac runner → Create runner token**, then on your Mac:
 
 ```bash
-npm run runner:install
+git clone https://github.com/Kommavineethkumar/hourly-capital.git && cd hourly-capital && npm install
+security add-generic-password -U -s "Capital Runner" -a "$USER" -w "<cap_ token>"
+npm run runner:install -- --api-url https://<capital-site>
 ```
+
+The runner sends the token as `X-Capital-Token` and only sees that user's tasks. Optional env: `CAPITAL_URL`, `CAPITAL_PROJECTS_DIR` (default working dir, defaults to `$HOME`), `CAPITAL_CODEX_MODEL` (default `gpt-6-luna`). Revoke tokens from the same panel.
 
 For foreground diagnosis or a single queue pass:
 
@@ -76,7 +80,9 @@ npm run runner:once
 
 ## Privacy model
 
-- The current Sites deployment is owner-only. If it is ever shared or made public, every visitor would use the same dataset because this version is intentionally single-user and does not partition records by account.
+- Every record (hours, backlog, tasks) belongs to the signed-in account (`oai-authenticated-user-id` from Sites sign-in). Every API reads and writes only the caller's rows.
+- Runner tokens are random 256-bit values; only their SHA-256 hash is stored. Tokens can't create other tokens.
+- On `localhost`, all requests are treated as one local user (`local-dev`).
 
 ## Continuous integration
 
@@ -84,19 +90,18 @@ GitHub Actions runs type-check, lint, build, and the rendered-HTML test suite on
 - Capital stores task instructions and information entered deliberately through the product.
 - It does not collect active applications, browser history, IDE activity, terminal activity, or other passive context.
 - CSV export is generated locally in the browser from the records already loaded into the product.
-- History currently loads the 100 most recent records, so CSV export covers those loaded records and does not include backlog items.
 - There is no bulk delete/reset control yet; manage retention before placing sensitive material in records.
 - Queued Codex tasks send their instructions and any explicitly enabled, relevance-filtered context to Codex. Aside Browser is used only when enabled for that task and when authenticated web context is actually needed.
 
-## Access, backup, and runner setup
+## Backup
 
-- **API access:** the Site is owner-private, so Sites hosting rejects every request that isn't you signed in or the Capital Runner's bypass token (which hosting consumes before the app sees it). The app adds no auth of its own; never change the Site's audience to public.
-- **Backup:** History → *Backup ↓* downloads all hours, backlog items, and tasks as JSON (`GET /api/backup`). *Restore ↑* re-imports a backup (`POST /api/backup`); rows whose id already exists are skipped, so restoring twice is safe.
-- **Deploy:** `npm run build` packages `dist/` plus `.openai/hosting.json` and `drizzle/` migrations for Sites hosting (D1 binding `DB`).
-- **Runner credential:** create the Keychain entry once, then install:
+- History → *Backup ↓* downloads your hours, backlog, and tasks as JSON (`GET /api/backup`). *Restore ↑* imports into your account; existing ids are skipped.
+- `scripts/backup-capital.mjs` does the same with your runner token (saves to `~/Documents/Capital Backups`, keeps 30). Schedule it with a LaunchAgent or cron.
 
-  ```bash
-  security add-generic-password -U -s "Capital Runner" -a "$USER" -w "<sites-bypass-token>"
-  npm run runner:install
-  ```
-- **Daily backup:** `scripts/backup-capital.mjs` runs at 21:00 via LaunchAgent `com.vinny.capital-backup` and keeps the 30 newest JSON backups in `~/Documents/Capital Backups`.
+## Deploy
+
+`npm run build` packages `dist/` plus `.openai/hosting.json` and `drizzle/` migrations for Sites hosting (D1 binding `DB`). Sites applies migrations on deploy. For local dev, apply `drizzle/*.sql` with wrangler as in the Sites starter docs.
+
+## License
+
+MIT — see `LICENSE`.

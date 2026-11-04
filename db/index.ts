@@ -13,45 +13,9 @@ function getD1() {
   return runtime.DB;
 }
 
+// Tables are created by drizzle migrations (applied by Sites on deploy, or locally via wrangler).
 export async function ensureStorage() {
-  const d1 = getD1();
-  await d1.batch([
-    d1.prepare(`CREATE TABLE IF NOT EXISTS hours (
-      id TEXT PRIMARY KEY NOT NULL,
-      date TEXT NOT NULL,
-      start_time TEXT NOT NULL,
-      end_time TEXT,
-      intention TEXT NOT NULL,
-      expected_output TEXT DEFAULT '' NOT NULL,
-      actual_activity TEXT DEFAULT '' NOT NULL,
-      output TEXT DEFAULT '' NOT NULL,
-      category TEXT NOT NULL,
-      score INTEGER,
-      focus INTEGER,
-      energy TEXT,
-      interruptions INTEGER DEFAULT 0 NOT NULL,
-      notes TEXT DEFAULT '' NOT NULL,
-      follow_up TEXT DEFAULT '' NOT NULL,
-      work_mode TEXT DEFAULT 'human' NOT NULL,
-      status TEXT DEFAULT 'planned' NOT NULL,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )`),
-    d1.prepare("CREATE INDEX IF NOT EXISTS idx_hours_date_start ON hours (date, start_time)"),
-    d1.prepare("CREATE INDEX IF NOT EXISTS idx_hours_status ON hours (status)"),
-    d1.prepare(`CREATE TABLE IF NOT EXISTS backlog_items (
-      id TEXT PRIMARY KEY NOT NULL,
-      title TEXT NOT NULL,
-      category TEXT NOT NULL,
-      energy TEXT DEFAULT 'Medium' NOT NULL,
-      minutes INTEGER DEFAULT 60 NOT NULL,
-      expected_output TEXT DEFAULT '' NOT NULL,
-      status TEXT DEFAULT 'open' NOT NULL,
-      created_at TEXT NOT NULL
-    )`),
-    d1.prepare("CREATE INDEX IF NOT EXISTS idx_backlog_status_created ON backlog_items (status, created_at)"),
-    d1.prepare("PRAGMA optimize"),
-  ]);
+  getD1();
 }
 
 export function getDb() {

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 import { spawn } from "node:child_process";
-import { userInfo } from "node:os";
+import os, { userInfo } from "node:os";
 import { access, stat } from "node:fs/promises";
 import { collectRelevantContext } from "./lib/context-collector.mjs";
 
-const DEFAULT_API_URL = "https://hourly-capital.vineethkumar-k-14679.chatgpt.site";
-const DEFAULT_CWD = "/Users/vineeth-14679/Documents/Vinny/projects";
+const DEFAULT_API_URL = process.env.CAPITAL_URL || "https://hourly-capital.vineethkumar-k-14679.chatgpt.site";
+const DEFAULT_CWD = process.env.CAPITAL_PROJECTS_DIR || os.homedir();
 const KEYCHAIN_SERVICE = "Capital Runner";
 const DEFAULT_INTERVAL_SECONDS = 5;
 const MAX_STATUS_LENGTH = 4_000;
@@ -108,7 +108,7 @@ async function readRunnerToken() {
 class CapitalApi {
   constructor(baseUrl, token) {
     this.tasksUrl = new URL("/api/tasks", `${baseUrl}/`);
-    this.authorization = `Bearer ${token}`;
+    this.token = token;
   }
 
   async request(method, body) {
@@ -120,7 +120,7 @@ class CapitalApi {
           headers: {
             Accept: "application/json",
             "Content-Type": "application/json",
-            "OAI-Sites-Authorization": this.authorization,
+            "X-Capital-Token": this.token,
           },
           body: body === undefined ? undefined : JSON.stringify(body),
           signal: AbortSignal.timeout(30_000),
@@ -336,7 +336,7 @@ async function runCodexTask(task, api) {
     await api.update(task.id, "running", { statusMessage: "Starting a separate Codex task." });
     await server.start();
     const threadResult = await server.request("thread/start", {
-      model: "gpt-6-luna",
+      model: process.env.CAPITAL_CODEX_MODEL || "gpt-6-luna",
       cwd,
       approvalPolicy: "never",
       sandbox: "workspace-write",
@@ -381,7 +381,7 @@ async function runCodexTask(task, api) {
       cwd,
       approvalPolicy: "never",
       sandboxPolicy: { type: "workspaceWrite", writableRoots: [cwd], networkAccess: true },
-      model: "gpt-6-luna",
+      model: process.env.CAPITAL_CODEX_MODEL || "gpt-6-luna",
       effort: "medium",
       serviceTier: "priority",
       summary: "concise",

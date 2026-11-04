@@ -4,6 +4,7 @@ export const hours = sqliteTable(
   "hours",
   {
     id: text("id").primaryKey(),
+    userId: text("user_id").notNull().default(""),
     date: text("date").notNull(),
     startTime: text("start_time").notNull(),
     endTime: text("end_time"),
@@ -25,6 +26,7 @@ export const hours = sqliteTable(
   },
   (table) => [
     index("idx_hours_date_start").on(table.date, table.startTime),
+    index("idx_hours_user_date").on(table.userId, table.date),
     index("idx_hours_status").on(table.status),
   ],
 );
@@ -36,6 +38,7 @@ export const backlogItems = sqliteTable(
   "backlog_items",
   {
     id: text("id").primaryKey(),
+    userId: text("user_id").notNull().default(""),
     title: text("title").notNull(),
     category: text("category").notNull(),
     energy: text("energy").notNull().default("Medium"),
@@ -44,7 +47,7 @@ export const backlogItems = sqliteTable(
     status: text("status").notNull().default("open"),
     createdAt: text("created_at").notNull(),
   },
-  (table) => [index("idx_backlog_status_created").on(table.status, table.createdAt)],
+  (table) => [index("idx_backlog_status_created").on(table.status, table.createdAt), index("idx_backlog_user").on(table.userId)],
 );
 
 export type BacklogItem = typeof backlogItems.$inferSelect;
@@ -54,6 +57,7 @@ export const codexTasks = sqliteTable(
   "codex_tasks",
   {
     id: text("id").primaryKey(),
+    userId: text("user_id").notNull().default(""),
     title: text("title").notNull(),
     instructions: text("instructions").notNull().default(""),
     status: text("status").notNull().default("inbox"),
@@ -68,8 +72,25 @@ export const codexTasks = sqliteTable(
     startedAt: text("started_at"),
     completedAt: text("completed_at"),
   },
-  (table) => [index("idx_codex_tasks_status_created").on(table.status, table.createdAt)],
+  (table) => [index("idx_codex_tasks_status_created").on(table.status, table.createdAt), index("idx_codex_tasks_user").on(table.userId)],
 );
 
 export type CodexTask = typeof codexTasks.$inferSelect;
 export type NewCodexTask = typeof codexTasks.$inferInsert;
+
+// Personal access tokens so a user's own Capital Runner / backup script can call the API.
+// Only the SHA-256 hash is stored; the plaintext is shown once at creation.
+export const apiTokens = sqliteTable(
+  "api_tokens",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    label: text("label").notNull().default(""),
+    createdAt: text("created_at").notNull(),
+    lastUsedAt: text("last_used_at"),
+  },
+  (table) => [index("idx_api_tokens_user").on(table.userId)],
+);
+
+export type ApiToken = typeof apiTokens.$inferSelect;

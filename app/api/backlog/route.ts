@@ -1,4 +1,5 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
+import { currentUserId, unauthorized } from "../../api-user";
 import { ensureStorage, getDb } from "../../../db";
 import { backlogItems, type NewBacklogItem } from "../../../db/schema";
 const categories = new Set(["Learning", "Artifact Creation", "Opportunity Development", "Automation & Leverage", "Work & Domain Depth", "Reflection & Optimization"]);
@@ -8,14 +9,18 @@ function clean(value: unknown, max = 500) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   await ensureStorage();
-  const items = await getDb().select().from(backlogItems).where(eq(backlogItems.status, "open")).orderBy(desc(backlogItems.createdAt));
+    const userId = await currentUserId(request);
+    if (!userId) return unauthorized();
+  const items = await getDb().select().from(backlogItems).where(and(eq(backlogItems.userId, userId), eq(backlogItems.status, "open"))).orderBy(desc(backlogItems.createdAt));
   return Response.json({ items });
 }
 
 export async function POST(request: Request) {
   await ensureStorage();
+    const userId = await currentUserId(request);
+    if (!userId) return unauthorized();
   const payload = (await request.json()) as Partial<NewBacklogItem>;
   const title = clean(payload.title);
   const category = clean(payload.category, 80);
@@ -24,6 +29,7 @@ export async function POST(request: Request) {
   if (!categories.has(category) || !energies.has(energy) || (payload.minutes != null && !Number.isInteger(payload.minutes))) return Response.json({ error: "Category, energy, or duration is invalid." }, { status: 400 });
   const [item] = await getDb().insert(backlogItems).values({
     id: crypto.randomUUID(),
+    userId,
     title,
     category,
     energy,
@@ -36,6 +42,8 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   await ensureStorage();
+    const userId = await currentUserId(request);
+    if (!userId) return unauthorized();
   const payload = (await request.json()) as { id?: string; status?: string; title?: string; category?: string; energy?: string; minutes?: number; expectedOutput?: string };
   if (!payload.id) return Response.json({ error: "Item id is required." }, { status: 400 });
   if (payload.status && payload.status !== "open" && payload.status !== "done") return Response.json({ error: "Status must be open or done." }, { status: 400 });
@@ -66,17 +74,19 @@ export async function PATCH(request: Request) {
   }
 
   if (!Object.keys(updates).length) return Response.json({ error: "No fields to update." }, { status: 400 });
-  const [item] = await getDb().update(backlogItems).set(updates).where(eq(backlogItems.id, payload.id)).returning();
+  const [item] = await getDb().update(backlogItems).set(updates).where(and(eq(backlogItems.id, payload.id), eq(backlogItems.userId, userId))).returning();
   if (!item) return Response.json({ error: "Item not found." }, { status: 404 });
   return Response.json({ item });
 }
 
 export async function DELETE(request: Request) {
   await ensureStorage();
+    const userId = await currentUserId(request);
+    if (!userId) return unauthorized();
   const payload = (await request.json()) as { id?: string };
   const id = clean(payload.id, 100);
   if (!id) return Response.json({ error: "Item id is required." }, { status: 400 });
-  const [item] = await getDb().delete(backlogItems).where(eq(backlogItems.id, id)).returning();
+  const [item] = await getDb().delete(backlogItems).where(and(eq(backlogItems.id, id), eq(backlogItems.userId, userId))).returning();
   if (!item) return Response.json({ error: "Item not found." }, { status: 404 });
   return Response.json({ item });
 }
