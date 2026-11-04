@@ -1,4 +1,5 @@
 import { desc, eq, and, like, or, gte, lte, sql } from "drizzle-orm";
+import { unauthorized } from "../../api-auth";
 import { ensureStorage, getDb } from "../../../db";
 import { hours, type NewHour } from "../../../db/schema";
 
@@ -23,6 +24,8 @@ function errorMessage(error: unknown) {
 const searchClean = (value: string | null, max = 100) => (value ?? "").trim().slice(0, max);
 
 export async function GET(request: Request) {
+  const denied = unauthorized(request);
+  if (denied) return denied;
   try {
     await ensureStorage();
     const params = new URL(request.url).searchParams;
@@ -77,6 +80,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const denied = unauthorized(request);
+  if (denied) return denied;
   try {
     await ensureStorage();
     const payload = (await request.json()) as HourPayload;
@@ -116,6 +121,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const denied = unauthorized(request);
+  if (denied) return denied;
   try {
     await ensureStorage();
     const payload = (await request.json()) as HourPayload;
@@ -155,6 +162,8 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const denied = unauthorized(request);
+  if (denied) return denied;
   try {
     await ensureStorage();
     const payload = (await request.json()) as HourPayload;

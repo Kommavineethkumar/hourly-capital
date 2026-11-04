@@ -1,4 +1,5 @@
 import { desc, eq } from "drizzle-orm";
+import { unauthorized } from "../../api-auth";
 import { ensureStorage, getDb } from "../../../db";
 import { codexTasks, type NewCodexTask } from "../../../db/schema";
 
@@ -17,17 +18,26 @@ function errorMessage(error: unknown) {
     : "Capital could not complete that task request.";
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = unauthorized(request);
+  if (denied) return denied;
   try {
     await ensureStorage();
-    const tasks = await getDb().select().from(codexTasks).orderBy(desc(codexTasks.createdAt)).limit(100);
-    return Response.json({ tasks });
+    const params = new URL(request.url).searchParams;
+    const limitParam = Number(params.get("limit"));
+    const offsetParam = Number(params.get("offset"));
+    const limit = Number.isInteger(limitParam) && limitParam > 0 ? Math.min(limitParam, 500) : 200;
+    const offset = Number.isInteger(offsetParam) && offsetParam >= 0 ? offsetParam : 0;
+    const tasks = await getDb().select().from(codexTasks).orderBy(desc(codexTasks.createdAt)).limit(limit + 1).offset(offset);
+    return Response.json({ tasks: tasks.slice(0, limit), hasMore: tasks.length > limit });
   } catch (error) {
     return Response.json({ error: errorMessage(error) }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
+  const denied = unauthorized(request);
+  if (denied) return denied;
   try {
     await ensureStorage();
     const payload = (await request.json()) as TaskPayload;
@@ -57,6 +67,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const denied = unauthorized(request);
+  if (denied) return denied;
   try {
     await ensureStorage();
     const payload = (await request.json()) as TaskPayload;
@@ -89,6 +101,8 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const denied = unauthorized(request);
+  if (denied) return denied;
   try {
     await ensureStorage();
     const payload = (await request.json()) as TaskPayload;

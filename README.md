@@ -87,3 +87,15 @@ GitHub Actions runs type-check, lint, build, and the rendered-HTML test suite on
 - History currently loads the 100 most recent records, so CSV export covers those loaded records and does not include backlog items.
 - There is no bulk delete/reset control yet; manage retention before placing sensitive material in records.
 - Queued Codex tasks send their instructions and any explicitly enabled, relevance-filtered context to Codex. Aside Browser is used only when enabled for that task and when authenticated web context is actually needed.
+
+## Access, backup, and runner setup
+
+- **API access:** every `/api/*` route returns `401` unless the request carries the hosting-injected `oai-authenticated-user-id` header (signed-in browser) or `OAI-Sites-Authorization` (Capital Runner). `localhost` is allowed for development. These headers are trusted only because Sites hosting sits in front of the Worker; don't expose the Worker any other way.
+- **Backup:** History → *Backup ↓* downloads all hours, backlog items, and tasks as JSON (`GET /api/backup`). *Restore ↑* re-imports a backup (`POST /api/backup`); rows whose id already exists are skipped, so restoring twice is safe.
+- **Deploy:** `npm run build` packages `dist/` plus `.openai/hosting.json` and `drizzle/` migrations for Sites hosting (D1 binding `DB`).
+- **Runner credential:** create the Keychain entry once, then install:
+
+  ```bash
+  security add-generic-password -U -s "Capital Runner" -a "$USER" -w "<sites-bypass-token>"
+  npm run runner:install
+  ```

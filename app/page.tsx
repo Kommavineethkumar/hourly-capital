@@ -77,6 +77,23 @@ function exportCsv(records: Hour[]) {
   URL.revokeObjectURL(link.href);
 }
 
+async function downloadBackup() {
+  const response = await fetch("/api/backup", { cache: "no-store" });
+  if (!response.ok) throw new Error("Backup failed.");
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(await response.blob());
+  link.download = `capital-backup-${localDate()}.json`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+async function restoreBackup(file: File) {
+  const response = await fetch("/api/backup", { method: "POST", headers: { "Content-Type": "application/json" }, body: await file.text() });
+  const data = (await response.json()) as { imported?: { hours: number; backlog: number; tasks: number }; error?: string };
+  if (!response.ok || !data.imported) throw new Error(data.error ?? "Restore failed.");
+  return data.imported;
+}
+
 export default function Home() {
   const [view, setView] = useState<View>("today");
   const [hours, setHours] = useState<Hour[]>([]);
@@ -657,7 +674,7 @@ export default function Home() {
         </section>
       ) : (
         <section className="history-page">
-          <div className="review-heading history-heading"><div><p className="eyebrow">Your evidence archive</p><h1>History, without surveillance.</h1><p>Only the hours and outcomes you deliberately recorded.</p></div><button className="secondary" onClick={() => exportCsv(history)}>Export CSV ↓</button></div>
+          <div className="review-heading history-heading"><div><p className="eyebrow">Your evidence archive</p><h1>History, without surveillance.</h1><p>Only the hours and outcomes you deliberately recorded.</p></div><div className="history-actions"><button className="secondary" onClick={() => exportCsv(history)}>Export CSV ↓</button><button className="secondary" onClick={() => downloadBackup().catch((e: Error) => setError(e.message))}>Backup ↓</button><label className="secondary button-like">Restore ↑<input type="file" accept="application/json" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) restoreBackup(file).then((n) => { window.alert(`Restored ${n.hours} hours, ${n.backlog} backlog items, ${n.tasks} tasks. Reloading.`); window.location.reload(); }).catch((e: Error) => setError(e.message)); }} /></label></div></div>
           <form className="history-search card" onSubmit={(event) => event.preventDefault()}>
             <input aria-label="Search history" value={searchQuery} onChange={(event) => { setSearchQuery(event.target.value); setHistoryPage(0); }} placeholder="Search intention, activity, output, notes…" />
             <label className="select-field">Category<select value={searchCategory} onChange={(event) => { setSearchCategory(event.target.value); setHistoryPage(0); }}><option value="">All categories</option>{categories.map(([name]) => <option key={name}>{name}</option>)}</select><span className="select-arrow" aria-hidden="true">⌄</span></label>
