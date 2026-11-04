@@ -66,6 +66,8 @@ export const codexTasks = sqliteTable(
     useAside: integer("use_aside", { mode: "boolean" }).notNull().default(false),
     projectPath: text("project_path").notNull().default(""),
     codexThreadId: text("codex_thread_id"),
+    // Follow-up for the existing Codex thread. Non-empty = runner resumes codexThreadId instead of starting a new one.
+    resumeMessage: text("resume_message").notNull().default(""),
     statusMessage: text("status_message").notNull().default(""),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),

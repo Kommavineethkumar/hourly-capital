@@ -1,0 +1,1 @@
+ALTER TABLE `codex_tasks` ADD `resume_message` text DEFAULT '' NOT NULL;

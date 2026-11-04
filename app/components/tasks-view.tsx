@@ -15,6 +15,7 @@ type CodexTask = {
   useAside: boolean;
   projectPath: string;
   codexThreadId: string | null;
+  resumeMessage?: string;
   statusMessage: string;
   createdAt: string;
 };
@@ -53,6 +54,7 @@ export default function TasksView() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [followUps, setFollowUps] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let active = true;
@@ -114,14 +116,14 @@ export default function TasksView() {
     }
   }
 
-  async function queueTask(task: CodexTask) {
+  async function queueTask(task: CodexTask, extra: Record<string, unknown> = {}) {
     setBusyId(task.id);
     setError("");
     try {
       const response = await fetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: task.id, status: "queued" }),
+        body: JSON.stringify({ id: task.id, status: "queued", ...extra }),
       });
       const data = (await response.json()) as { task?: CodexTask; error?: string };
       if (!response.ok || !data.task) throw new Error(data.error || "Could not queue the task.");
@@ -194,7 +196,10 @@ export default function TasksView() {
         <ul className="task-list" aria-label="Codex tasks">
           {tasks.map((task) => {
             const busy = busyId === task.id;
-            const canQueue = task.status === "inbox" || task.status === "failed" || task.status === "cancelled";
+            const finished = task.status !== "inbox" && task.status !== "queued" && task.status !== "running";
+            const canContinue = finished && Boolean(task.codexThreadId);
+            const canQueue = task.status === "inbox" || ((task.status === "failed" || task.status === "cancelled") && !task.codexThreadId);
+            const followUp = followUps[task.id] ?? "";
             return (
               <li key={task.id}>
                 <article className="task-card card" aria-labelledby={`task-${task.id}`} aria-busy={busy}>
@@ -218,6 +223,16 @@ export default function TasksView() {
                     {task.useAside && <span>Aside enabled</span>}
                     {task.projectPath && <span className="task-path">{task.projectPath}</span>}
                   </div>
+                  {canContinue && (
+                    <div className="task-continue">
+                      <label htmlFor={`follow-${task.id}`}>Follow-up for the same Codex session</label>
+                      <textarea id={`follow-${task.id}`} rows={2} value={followUp} placeholder={task.status === "needs_input" ? "Answer Codex’s question…" : "What should Codex do next?"} onChange={(e) => setFollowUps((c) => ({ ...c, [task.id]: e.target.value }))} />
+                      <div className="task-actions">
+                        <button className="primary dark" type="button" disabled={busy || !followUp.trim()} onClick={() => queueTask(task, { resumeMessage: followUp.trim() }).then(() => setFollowUps((c) => ({ ...c, [task.id]: "" })))}>Continue session<span>→</span></button>
+                        <button className="secondary" type="button" disabled={busy} onClick={() => { if (window.confirm("Start a brand-new Codex session? The previous session’s conversation won’t be reused.")) queueTask(task, { freshSession: true }); }}>Start fresh session</button>
+                      </div>
+                    </div>
+                  )}
                   <div className="task-actions">
                     {canQueue && <button className="primary dark" type="button" disabled={busy} onClick={() => queueTask(task)}>{busy ? "Updating…" : task.status === "inbox" ? "Start" : "Retry"}<span>→</span></button>}
                     {task.codexThreadId && <a className="secondary task-thread-link" href={`codex://threads/${encodeURIComponent(task.codexThreadId)}`} aria-label={`Open ${task.title} in Codex`}>Open Codex task ↗</a>}

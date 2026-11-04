@@ -3,7 +3,7 @@ import { currentUserId, unauthorized } from "../../api-user";
 import { ensureStorage, getDb } from "../../../db";
 import { codexTasks, type NewCodexTask } from "../../../db/schema";
 
-type TaskPayload = Partial<NewCodexTask> & { id?: string };
+type TaskPayload = Partial<NewCodexTask> & { id?: string; freshSession?: boolean };
 
 const statuses = new Set(["inbox", "queued", "running", "needs_input", "completed", "failed", "cancelled"]);
 
@@ -87,6 +87,13 @@ export async function PATCH(request: Request) {
     };
     if ("codexThreadId" in payload) update.codexThreadId = clean(payload.codexThreadId, 200) || null;
     if ("statusMessage" in payload) update.statusMessage = clean(payload.statusMessage, 4_000);
+    if ("resumeMessage" in payload) update.resumeMessage = clean(payload.resumeMessage, 8_000);
+    // "Start fresh" explicitly drops the old thread so a new Codex session is intentional.
+    if (payload.freshSession === true) { update.codexThreadId = null; update.resumeMessage = ""; }
+    if (status === "queued" && update.resumeMessage) {
+      const [existing] = await getDb().select({ thread: codexTasks.codexThreadId }).from(codexTasks).where(and(eq(codexTasks.id, id), eq(codexTasks.userId, userId))).limit(1);
+      if (!existing?.thread) return Response.json({ error: "This task has no Codex session to continue." }, { status: 400 });
+    }
 
     const [task] = await getDb()
       .update(codexTasks)

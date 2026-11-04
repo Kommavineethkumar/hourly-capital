@@ -343,24 +343,26 @@ async function runCodexTask(rawTask, api) {
   const agentMessages = [];
 
   try {
-    await api.update(task.id, "running", { statusMessage: "Starting a separate Codex task." });
+    const resumeMessage = typeof task.resumeMessage === "string" ? task.resumeMessage.trim() : "";
+    const continuing = Boolean(resumeMessage && task.codexThreadId);
+    await api.update(task.id, "running", { statusMessage: continuing ? "Continuing the existing Codex session." : "Starting a new Codex session." });
     await server.start();
-    const threadResult = await server.request("thread/start", {
-      model: process.env.CAPITAL_CODEX_MODEL || "gpt-6-luna",
-      cwd,
-      approvalPolicy: "never",
-      sandbox: "workspace-write",
-      serviceTier: "priority",
-      serviceName: "capital_runner",
-      ephemeral: false,
-    });
-    threadId = threadResult?.thread?.id;
-    if (!threadId) throw new Error("Codex did not return a thread id.");
-
-    await server.request("thread/name/set", { threadId, name: String(task.title).trim().slice(0, 240) });
+    const sessionOptions = { model: process.env.CAPITAL_CODEX_MODEL || "gpt-6-luna", cwd, approvalPolicy: "never", sandbox: "workspace-write", serviceTier: "priority" };
+    if (continuing) {
+      // Continue: reuse the same thread so Codex keeps its full prior conversation.
+      const resumed = await server.request("thread/resume", { threadId: task.codexThreadId, ...sessionOptions });
+      threadId = resumed?.thread?.id;
+      if (threadId !== task.codexThreadId) throw new Error("Codex could not resume the previous session.");
+    } else {
+      const threadResult = await server.request("thread/start", { ...sessionOptions, serviceName: "capital_runner", ephemeral: false });
+      threadId = threadResult?.thread?.id;
+      if (!threadId) throw new Error("Codex did not return a thread id.");
+      await server.request("thread/name/set", { threadId, name: String(task.title).trim().slice(0, 240) });
+    }
     await api.update(task.id, "running", {
       codexThreadId: threadId,
-      statusMessage: "Codex is working in a separate task.",
+      resumeMessage: "",
+      statusMessage: continuing ? "Codex is continuing the same session." : "Codex is working in a new session.",
     });
 
     const outcome = new Promise((resolve) => {
@@ -387,7 +389,7 @@ async function runCodexTask(rawTask, api) {
 
     const turnResult = await server.request("turn/start", {
       threadId,
-      input: [{ type: "text", text: buildPrompt(taskWithContext, cwd) }],
+      input: [{ type: "text", text: continuing ? resumeMessage : buildPrompt(taskWithContext, cwd) }],
       cwd,
       approvalPolicy: "never",
       sandboxPolicy: { type: "workspaceWrite", writableRoots: [cwd], networkAccess: true },
