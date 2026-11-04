@@ -55,7 +55,7 @@ function parseArgs(argv) {
   }
 
   const apiUrl = new URL(options.apiUrl);
-  if (!new Set(["http:", "https:"]).has(apiUrl.protocol)) throw new Error("--api-url must use HTTP or HTTPS.");
+  if (apiUrl.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(apiUrl.hostname)) throw new Error("--api-url must use HTTPS (the token is sent with every request).");
   options.apiUrl = apiUrl.href.replace(/\/$/, "");
   return options;
 }
@@ -254,10 +254,15 @@ class CodexAppServer {
   }
 }
 
+// Security: task paths come from the website, so a task may only work inside
+// CAPITAL_PROJECTS_DIR (default $HOME). Anything else falls back to that root.
 async function usableProjectPath(value) {
   if (typeof value !== "string" || !value.trim()) return DEFAULT_CWD;
-  const candidate = value.trim();
+  const { realpath } = await import("node:fs/promises");
+  const root = await realpath(DEFAULT_CWD);
   try {
+    const candidate = await realpath(value.trim());
+    if (candidate !== root && !candidate.startsWith(root + "/")) return DEFAULT_CWD;
     await access(candidate);
     if ((await stat(candidate)).isDirectory()) return candidate;
   } catch {
@@ -320,7 +325,12 @@ function finalAgentMessage(turn, streamedMessages) {
     || "Codex completed the task.";
 }
 
-async function runCodexTask(task, api) {
+// Security: the website can request these, but only the Mac owner can allow them.
+const ALLOW_CONTEXT = process.env.CAPITAL_ALLOW_CONTEXT === "1";
+const ALLOW_ASIDE = process.env.CAPITAL_ALLOW_ASIDE === "1";
+
+async function runCodexTask(rawTask, api) {
+  const task = { ...rawTask, usePriorContext: rawTask.usePriorContext && ALLOW_CONTEXT, useAside: rawTask.useAside && ALLOW_ASIDE };
   const cwd = await usableProjectPath(task.projectPath);
   const collectedContext = task.usePriorContext
     ? await collectRelevantContext({ ...task, cwd }, { maxChars: 12_000 })

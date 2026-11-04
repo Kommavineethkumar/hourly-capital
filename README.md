@@ -67,7 +67,14 @@ security add-generic-password -U -s "Capital Runner" -a "$USER" -w "<cap_ token>
 npm run runner:install -- --api-url https://<capital-site>
 ```
 
-The runner sends the token as `X-Capital-Token` and only sees that user's tasks. Optional env: `CAPITAL_URL`, `CAPITAL_PROJECTS_DIR` (default working dir, defaults to `$HOME`), `CAPITAL_CODEX_MODEL` (default `gpt-6-luna`). Revoke tokens from the same panel.
+The runner sends the token as `X-Capital-Token` and only sees that user's tasks.
+
+**Safety defaults (the website cannot override these):**
+- Codex runs sandboxed (`workspace-write`), writing only inside the task's folder.
+- Task folders must be inside `CAPITAL_PROJECTS_DIR` (default `$HOME`); other paths fall back to that root.
+- Sharing local agent history (Codex/Claude/Pi/Hermes) is off unless you set `CAPITAL_ALLOW_CONTEXT=1`; Aside Browser use is off unless `CAPITAL_ALLOW_ASIDE=1`.
+- The token is only sent over HTTPS, stored in your macOS Keychain, and can be revoked in Capital at any time.
+- Only queue tasks you'd be willing to run yourself: the runner executes your own task text with your Codex account. Optional env: `CAPITAL_URL`, `CAPITAL_PROJECTS_DIR` (default working dir, defaults to `$HOME`), `CAPITAL_CODEX_MODEL` (default `gpt-6-luna`). Revoke tokens from the same panel.
 
 For foreground diagnosis or a single queue pass:
 

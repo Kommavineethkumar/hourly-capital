@@ -168,6 +168,7 @@ export default function Home() {
         const [todayResponse, backlogResponse] = response;
         const todayData = (await todayResponse.json()) as { hours: Hour[]; error?: string };
         const backlogData = (await backlogResponse.json()) as { items: BacklogItem[]; error?: string };
+        if (todayResponse.status === 401) { window.location.href = `/signin-with-chatgpt?return_to=${encodeURIComponent(window.location.pathname)}`; return; }
         if (!todayResponse.ok) throw new Error(todayData.error || "Could not load today.");
         if (!backlogResponse.ok) throw new Error(backlogData.error || "Could not load backlog.");
         setHours(todayData.hours);
