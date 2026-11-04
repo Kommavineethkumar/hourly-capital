@@ -99,3 +99,4 @@ GitHub Actions runs type-check, lint, build, and the rendered-HTML test suite on
   security add-generic-password -U -s "Capital Runner" -a "$USER" -w "<sites-bypass-token>"
   npm run runner:install
   ```
+- **Daily backup:** `scripts/backup-capital.mjs` runs at 21:00 via LaunchAgent `com.vinny.capital-backup` and keeps the 30 newest JSON backups in `~/Documents/Capital Backups`.
